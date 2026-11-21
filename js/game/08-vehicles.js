@@ -12,12 +12,13 @@ let _vid = 1;
 class Vehicle {
   constructor(type, x, z, yaw, opts = {}) {
     this.id = _vid++; this.type = type; this.spec = CFG.VEHICLES[type]; this.cls = this.spec.cls; this.isBike = !!this.spec.bike; this.boat = this.cls === 'boat'; this.air = this.cls === 'plane' || this.cls === 'heli';
-    this.isPolice = !!this.spec.police; this.military = this.air && this.type !== 'plane' || type === 'jet';
+    this.isPolice = !!this.spec.police; this.military = !!this.spec.military || type === 'jet';
     this.color = opts.color || pick(this.spec.colors); this.m = buildVehicleModel(type, this.color); this.group = this.m.group; this.body = this.m.body;
     this.halfL = this.m.len / 2; this.halfW = this.m.wid / 2; this.height = this.m.height;
     this.pos = V3(x, 0, z); this.yaw = yaw; this.q = new THREE.Quaternion().setFromEuler(tmpE.set(0, yaw, 0, 'YXZ'));
     this.pos.y = this.boat ? CFG.WATER_Y : groundHeight(x, z, 50) + (this.air && this.cls === 'plane' ? this.m.gearH - 0 : 0);
     if (this.cls === 'heli' || this.cls === 'plane') this.pos.y = groundHeight(x, z, 50) + 0.02;
+    if ((this.spec.floats || this.spec.blimp) && terrainHeight(x, z) < -0.3) this.pos.y = CFG.WATER_Y + 0.02;
     this.vel = V3(); this.w = V3(); this.yawRate = 0; this.steer = 0; this.gear = 1; this.rpm = 900; this.shiftT = 0; this.accLong = 0; this.spin = false; this.pitch = 0; this.roll = 0; this.airborne = false; this.vy = 0;
     this.thr = 0; this.rotorSpin = 0; this.onGround = true; this.vF = 0; this.vL = 0;
     this.health = this.spec.hp; this.dead = false; this.burnT = 0; this.sinking = false; this.deadT = 0; this.flipped = false; this.nitro = 1; this.boosting = false; this.braking = false;
@@ -120,22 +121,27 @@ class Vehicle {
   }
   // --- Boot: Schub, Wasserwiderstand, Kielführung, Wellen ---
   updateBoat(dt, inp) {
-    const S = this.spec, vmax = BOAT_VMAX[this.type] || 20, m = S.mass, sn = Math.sin(this.yaw), cs = Math.cos(this.yaw);
+    const S = this.spec, vmax = S.vmax || BOAT_VMAX[this.type] || 20, m = S.mass, sn = Math.sin(this.yaw), cs = Math.cos(this.yaw);
     let vF = this.vel.x * sn + this.vel.z * cs, vL = -this.vel.x * cs + this.vel.z * sn;
     const thrust = (inp.throttle - inp.brake * 0.5) * S.thrust * (inp.boost ? 1.3 : 1); this.boosting = !!inp.boost && inp.throttle > 0;
     const k = S.thrust / m / (vmax * vmax); vF += (thrust / m - k * vF * Math.abs(vF) * (vF < 0 ? 3 : 1)) * dt; vL *= Math.exp(-S.lat * dt);
     this.steer = damp(this.steer, inp.steer, 4, dt); const yr = this.steer * S.turn * clamp(vF / 4, -0.8, 1.3) * (1 - 0.35 * Math.abs(vF) / vmax); this.yawRate = damp(this.yawRate, yr, 3, dt); this.yaw += this.yawRate * dt;
     const s2 = Math.sin(this.yaw), c2 = Math.cos(this.yaw); this.vel.set(s2 * vF - c2 * vL, 0, c2 * vF + s2 * vL); this.vF = vF; this.vL = vL;
     const ox = this.pos.x, oz = this.pos.z; this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
-    const draft = this.type === 'yacht' ? 2.2 : this.type === 'fishing' ? 1.6 : 0.5, th = terrainHeight(this.pos.x, this.pos.z);
-    if (th > -draft) { this.pos.x = ox; this.pos.z = oz; this.vel.multiplyScalar(-0.25); if (Math.abs(vF) > 6) { this.damage(Math.abs(vF) * 0.6); Audio.impact(8, this.camDist()); } }
+    const draft = S.draft ?? (this.type === 'yacht' ? 2.2 : this.type === 'fishing' ? 1.6 : 0.5), th = terrainHeight(this.pos.x, this.pos.z);
+    let land = false; if (S.amph && th > -0.25 && th < 2.2 && Math.abs(terrainHeight(this.pos.x + 1.5, this.pos.z) - terrainHeight(this.pos.x - 1.5, this.pos.z)) < 0.9 && Math.abs(terrainHeight(this.pos.x, this.pos.z + 1.5) - terrainHeight(this.pos.x, this.pos.z - 1.5)) < 0.9) land = th > CFG.WATER_Y - 0.1;
+    if (th > -draft && !land && !(S.amph && th <= CFG.WATER_Y - 0.1)) { this.pos.x = ox; this.pos.z = oz; this.vel.multiplyScalar(-0.25); if (Math.abs(vF) > 6) { this.damage(Math.abs(vF) * 0.6); Audio.impact(8, this.camDist()); } }
     const B = WS - 30; this.pos.x = clamp(this.pos.x, -B, B); this.pos.z = clamp(this.pos.z, -B, B);
     const t = GameTime, w0 = waveH(this.pos.x, this.pos.z, t), wF = waveH(this.pos.x + s2 * this.halfL, this.pos.z + c2 * this.halfL, t), wB = waveH(this.pos.x - s2 * this.halfL, this.pos.z - c2 * this.halfL, t);
     const plane = clamp(Math.abs(vF) / vmax, 0, 1);
-    this.pos.y = damp(this.pos.y, CFG.WATER_Y + w0 + plane * 0.25 * (this.type === 'yacht' ? 0.3 : 1), 6, dt);
-    this.pitch = damp(this.pitch, Math.atan2(wF - wB, this.halfL * 2) + plane * 0.1 * (this.type === 'yacht' ? 0.3 : 1), 4, dt);
+    if (land) { this.pos.y = damp(this.pos.y, th + 0.04, 10, dt); this.vel.multiplyScalar(Math.exp(-dt * 0.45)); this.pitch = damp(this.pitch, Math.atan2(terrainHeight(this.pos.x + s2 * 2, this.pos.z + c2 * 2) - terrainHeight(this.pos.x - s2 * 2, this.pos.z - c2 * 2), 4), 6, dt); }
+    else { this.pos.y = damp(this.pos.y, CFG.WATER_Y + w0 + plane * 0.25 * (this.type === 'yacht' ? 0.3 : 1), 6, dt);
+    this.pitch = damp(this.pitch, Math.atan2(wF - wB, this.halfL * 2) + plane * 0.1 * (this.type === 'yacht' ? 0.3 : 1), 4, dt); }
     this.roll = damp(this.roll, -this.yawRate * Math.abs(vF) * 0.02 + Math.sin(t * 1.3 + this.id) * 0.03 * (1 + Env.w.wind), 3, dt);
-    if (Math.abs(vF) > 4 && Math.random() < 0.7) { FX.splash(tmpV2.set(this.pos.x - s2 * this.halfL, 0, this.pos.z - c2 * this.halfL), 2); if (Math.random() < 0.5) FX.splash(tmpV2.set(this.pos.x + s2 * this.halfL * 0.6 + c2 * this.halfW, 0, this.pos.z + c2 * this.halfL * 0.6 - s2 * this.halfW), 1); }
+    if (this.m.fan) this.m.fan.rotation.z += dt * (this.driver ? 8 + Math.abs(inp.throttle - inp.brake) * 55 : 0);
+    if (this.m.sail) { const rel = wrapAngle(0.9 - this.yaw); this.m.sail.rotation.y = damp(this.m.sail.rotation.y, (rel > 0 ? -1 : 1) * (0.25 + 0.35 * Math.abs(Math.sin(rel))), 1.2, dt); }
+    if (land && Math.abs(vF) > 3 && Math.random() < 0.4) FX.dust(tmpV2.set(this.pos.x - s2 * this.halfL, th, this.pos.z - c2 * this.halfL), 1);
+    if (!land && Math.abs(vF) > 4 && Math.random() < 0.7) { FX.splash(tmpV2.set(this.pos.x - s2 * this.halfL, 0, this.pos.z - c2 * this.halfL), 2); if (Math.random() < 0.5) FX.splash(tmpV2.set(this.pos.x + s2 * this.halfL * 0.6 + c2 * this.halfW, 0, this.pos.z + c2 * this.halfL * 0.6 - s2 * this.halfW), 1); }
     this.collideWorld();
   }
   axes() { this.fwd = (this.fwd || V3()).set(0, 0, 1).applyQuaternion(this.q); this.up = (this.up || V3()).set(0, 1, 0).applyQuaternion(this.q); this.right = (this.right || V3()).set(-1, 0, 0).applyQuaternion(this.q); }
@@ -172,15 +178,17 @@ class Vehicle {
     this.vel.copy(this.fwd).multiplyScalar(this.spd); this.vel.y -= this.sinkV;
     this.pos.addScaledVector(this.vel, dt);
     // Boden-/Fahrwerkskontakt: sanfte Landung möglich, harte Aufschläge zerstören
-    const gh = groundHeight(this.pos.x, this.pos.z, this.pos.y + 1);
+    let gh = groundHeight(this.pos.x, this.pos.z, this.pos.y + 1); const wet = S.floats && terrainHeight(this.pos.x, this.pos.z) < -0.3; if (wet) gh = Math.max(gh, CFG.WATER_Y + waveH(this.pos.x, this.pos.z, GameTime) * 0.6);
     if (this.pos.y <= gh + 0.02) { const vy = -this.vel.y; this.pos.y = gh + 0.02;
       if (!this.onGround) { const bank = Math.abs(Math.atan2(-this.right.y, this.up.y));
-        if (vy > 9 || bank > 0.5 || this.fwd.y < -0.3 || terrainHeight(this.pos.x, this.pos.z) < -0.5) { this.explode(this === Player.vehicle); return; }
+        if (vy > 9 || bank > 0.5 || this.fwd.y < -0.3 || (!S.floats && terrainHeight(this.pos.x, this.pos.z) < -0.5)) { this.explode(this === Player.vehicle); return; }
+        if (wet) FX.splash(this.pos, 8);
         if (vy > 4) { this.damage(vy * 3, false); if (this === Player.vehicle) Cam.shake = 0.5; } this.onGround = true; }
       this.onGround = true;
       if (this.fwd.y > 0.12 && this.spd > S.vStall) { this.onGround = false; this.pos.y = gh + 0.3; } // abheben
     } else if (this.onGround && this.pos.y > gh + 0.5) this.onGround = false;
-    if (this.m.prop) this.m.prop.rotation.z += dt * (8 + this.thr * 60);
+    if (wet && this.onGround) { this.spd *= Math.exp(-dt * (this.thr < 0.3 ? 0.5 : 0.18)); if (Math.abs(this.spd) > 4 && Math.random() < 0.6) FX.splash(tmpV2.set(this.pos.x - this.fwd.x * this.halfL * 0.3, 0, this.pos.z - this.fwd.z * this.halfL * 0.3), 1); }
+    if (this.m.prop) this.m.prop.rotation.z += dt * (8 + this.thr * 60); for (const p of this.m.props) p.rotation.z += dt * (this.driver ? 8 + this.thr * 60 : 0);
     if (this.m.burner) this.m.burner.material.opacity = this.boosting ? 0.7 + Math.random() * 0.3 : this.thr > 0.6 ? (this.thr - 0.6) * 0.6 : 0;
     if (this.m.gear) this.m.gear.visible = this.onGround || this.pos.y - gh < 40;
     this.yaw = Math.atan2(this.fwd.x, this.fwd.z); this.vF = this.spd; this.aoa = 0;
@@ -188,27 +196,42 @@ class Vehicle {
   }
   // --- Helikopter: Rotor, Höhe halten, Neigung bestimmt Bewegung ---
   updateHeli(dt, inp) {
-    const m = this.spec.mass, g = CFG.GRAVITY;
+    if (this.spec.blimp) return this.updateBlimp(dt, inp);
+    const S = this.spec, m = S.mass, g = CFG.GRAVITY, tilt = S.tilt || 1;
     this.rotorSpin = this.driver ? Math.min(1, this.rotorSpin + dt * 0.45) : Math.max(0, this.rotorSpin - dt * 0.2);
     const coll = (inp.up - inp.down);
-    this.pitch = damp(this.pitch, inp.pitch * 0.5, 2.5, dt); this.roll = damp(this.roll, inp.roll * 0.45, 2.5, dt);
-    this.yawRate = damp(this.yawRate, inp.yaw * 1.3, 3, dt); this.yaw += this.yawRate * dt;
+    this.pitch = damp(this.pitch, inp.pitch * 0.5 * tilt, 2.5, dt); this.roll = damp(this.roll, inp.roll * 0.45 * tilt, 2.5, dt);
+    this.yawRate = damp(this.yawRate, inp.yaw * 1.3 * (S.yawR || 1), 3, dt); this.yaw += this.yawRate * dt;
     this.q.setFromEuler(tmpE.set(this.pitch, this.yaw, this.roll, 'YXZ')); this.axes();
-    const lift = this.rotorSpin < 0.95 ? m * g * this.rotorSpin * 0.9 * (coll > 0 ? 1.1 : 0.9) : m * (g + coll * 7 - this.vel.y * 1.4) / Math.max(0.55, this.up.y);
+    const lift = this.rotorSpin < 0.95 ? m * g * this.rotorSpin * 0.9 * (coll > 0 ? 1.1 : 0.9) : m * (g + coll * 7 * (S.lift || 1) - this.vel.y * 1.4) / Math.max(0.55, this.up.y);
     const F = tmpV4.copy(this.up).multiplyScalar(Math.max(0, lift) * (this.health < this.spec.hp * 0.3 ? 0.85 : 1)); F.y -= m * g;
     F.x -= this.vel.x * m * 0.1; F.z -= this.vel.z * m * 0.1; F.y -= this.vel.y * m * 0.2;
     this.vel.addScaledVector(F, dt / m); this.pos.addScaledVector(this.vel, dt);
     const gh = groundHeight(this.pos.x, this.pos.z, this.pos.y + 1);
     if (this.pos.y <= gh + 0.02) { const imp = -this.vel.y; this.pos.y = gh + 0.02; if (!this.onGround && (imp > 8 || this.up.y < 0.7 || terrainHeight(this.pos.x, this.pos.z) < -0.5)) { this.explode(this === Player.vehicle); return; } this.onGround = true; this.vel.y = Math.max(0, this.vel.y); this.vel.x *= 0.9; this.vel.z *= 0.9; }
     else this.onGround = false;
-    if (this.m.rotor) this.m.rotor.rotation.y += dt * this.rotorSpin * 28; if (this.m.tailRotor) this.m.tailRotor.rotation.x += dt * this.rotorSpin * 40;
+    if (this.m.rotor) this.m.rotor.rotation.y += dt * this.rotorSpin * 28; if (this.m.tailRotor) this.m.tailRotor.rotation.x += dt * this.rotorSpin * 40; if (this.m.rotor2) this.m.rotor2.rotation.y -= dt * this.rotorSpin * 24;
     this.vF = this.vel.dot(this.fwd); this.airCollide();
     if (this.rotorSpin > 0.5 && this.pos.y - gh < 10 && Math.random() < 0.4) FX.dust(tmpV2.set(this.pos.x + rand(-5, 5), gh, this.pos.z + rand(-5, 5)), 1);
   }
+  // --- Zeppelin: Auftrieb trägt, Propeller schieben, träge Drehung, landet sanft ---
+  updateBlimp(dt, inp) {
+    this.rotorSpin = this.driver ? Math.min(1, this.rotorSpin + dt * 0.5) : Math.max(0, this.rotorSpin - dt * 0.3); const on = this.rotorSpin * (this.health < this.spec.hp * 0.3 ? 0.6 : 1);
+    this.yawRate = damp(this.yawRate, inp.yaw * 0.32 * on, 1.2, dt); this.yaw += this.yawRate * dt;
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw); let vF = this.vel.x * fx + this.vel.z * fz, vL = this.vel.x * fz - this.vel.z * fx;
+    vF = damp(vF, (inp.pitch > 0 ? inp.pitch * 21 : inp.pitch * 6) * on, 0.35, dt); vL *= Math.exp(-dt * 1.2);
+    const sink = this.dead ? -6 : on < 0.4 && !this.onGround ? -1.2 : 0; this.vel.set(fx * vF + fz * vL, damp(this.vel.y, (inp.up - inp.down) * 5 * on + sink, 0.8, dt), fz * vF - fx * vL);
+    this.pos.addScaledVector(this.vel, dt); this.pos.y = Math.min(this.pos.y, 650);
+    this.pitch = damp(this.pitch, -this.vel.y * 0.025 + inp.pitch * 0.03, 1, dt); this.roll = damp(this.roll, -this.yawRate * vF * 0.012, 1, dt);
+    this.q.setFromEuler(tmpE.set(this.pitch, this.yaw, this.roll, 'YXZ')); this.axes();
+    const gh = Math.max(groundHeight(this.pos.x, this.pos.z, this.pos.y + 1), CFG.WATER_Y + 0.3);
+    if (this.pos.y <= gh + 0.02) { this.pos.y = gh + 0.02; this.vel.y = Math.max(0, this.vel.y); this.onGround = true; this.vel.x *= 0.96; this.vel.z *= 0.96; } else this.onGround = false;
+    for (const p of this.m.props) p.rotation.z += dt * this.rotorSpin * (10 + Math.abs(inp.pitch) * 30); this.vF = vF; this.airCollide();
+  }
   airCollide() {
-    const r = this.cls === 'heli' ? 4.5 : Math.min(5, this.halfW * 0.7); tmpV2.set(this.pos.x, 0, this.pos.z);
+    const r = this.spec.blimp ? 6 : this.cls === 'heli' ? (this.type === 'cargoheli' ? 6 : 4.5) : Math.min(5, this.halfW * 0.7); tmpV2.set(this.pos.x, 0, this.pos.z);
     const h = collideCircle(tmpV2, r, this.pos.y + 0.5, 2.5);
-    if (h) { const sp = this.speed; if (sp > (this.cls === 'heli' ? 7 : 15)) { this.explode(this === Player.vehicle); return; } this.pos.x = tmpV2.x; this.pos.z = tmpV2.z; this.vel.multiplyScalar(0.3); }
+    if (h) { const sp = this.speed; if (!this.spec.blimp && sp > (this.cls === 'heli' ? 7 : 15)) { this.explode(this === Player.vehicle); return; } this.pos.x = tmpV2.x; this.pos.z = tmpV2.z; this.vel.multiplyScalar(0.3); }
   }
   flip() { if (!this.boat && !this.air) this.flipped = true; }
   resetUpright() { this.flipped = false; this.airborne = false; this.vel.set(0, 0, 0); this.yawRate = 0; this.pos.y = groundHeight(this.pos.x, this.pos.z) + 0.1; this.pitch = this.roll = 0;
@@ -217,7 +240,7 @@ class Vehicle {
   damage(a, byPlayer = false) {
     if (this.dead || this.sinking) return; if (this === Player.vehicle && Admin.god) return; this.health -= a * (1 - ((this.upg && this.upg.armor) || 0) * 0.2); if (byPlayer) this.lastPlayerHit = GameTime;
     if (this.health <= 0 && this.burnT <= 0) { this.health = 0; this.burnT = 4; if (this.ai) this.ai.panic = 10; }
-    if (byPlayer && this.ai && this.ai.mode === 'traffic') this.ai.panic = Math.max(this.ai.panic, 6);
+    if (byPlayer && this.ai && (this.ai.mode === 'traffic' || this.ai.mode === 'boat')) this.ai.panic = Math.max(this.ai.panic, 6);
   }
   explode(byPlayer = false) {
     if (this.dead) return; this.dead = true; this.health = 0; this.burnT = 0; this.deadT = 0; this.sirenOn = false;
@@ -250,6 +273,7 @@ class Vehicle {
     }
     this.m.tailMat.emissiveIntensity = this.dead ? 0 : this.braking ? 4 : 0.5 + Env.night * 1.2;
     if (this.m.blinkers) { const on = !this.dead && Math.floor(GameTime * 3) % 2 === 0; for (const b of this.m.blinkers.L) b.visible = on && this.blink === -1; for (const b of this.m.blinkers.R) b.visible = on && this.blink === 1; }
+    if (this.m.beam) this.m.beam.visible = this.sirenOn && !this.dead && Env.night > 0.25;
     if (this.m.bar) { const on = this.sirenOn && !this.dead, ph = Math.floor(GameTime * 7) % 2; this.m.bar[0].emissiveIntensity = on ? (ph ? 9 : 0.3) : 0.2; this.m.bar[1].emissiveIntensity = on ? (ph ? 0.3 : 9) : 0.2; }
     if (this.occupant) this.occupant.animate(dt, { sit: true, bike: this.occupant.pose === 'bike', speed: 0 });
     if (dt > 0 && !this.sinking) {
@@ -270,7 +294,7 @@ class VehicleSystem {
   constructor() { this.list = []; this.spawnT = 0; this.copT = 0; this.heli = null; }
   spawn(type, x, z, yaw, opts) { const v = new Vehicle(type, x, z, yaw, opts); this.list.push(v); return v; }
   remove(v) { const i = this.list.indexOf(v); if (i >= 0) this.list.splice(i, 1); v.remove(); }
-  spawnParked() { for (const [type, x, z, yaw, color] of PARKED) this.spawn(type, x, z, yaw, { persistent: true, color, spawnPoint: { type, x, z, yaw, color } }); }
+  spawnParked() { for (const [type, x, z, yaw, color, y] of PARKED) { const v = this.spawn(type, x, z, yaw, { persistent: true, color: color || undefined, spawnPoint: { type, x, z, yaw, color, y } }); if (y != null) v.pos.y = y; } }
   laneOff(e) { return e.hw * 0.45; }
   roadSpawn(focus, minD, maxD, behind = null) {
     const cand = Roads.edges.filter(e => e.type !== 'service' && Math.hypot(e.pts[e.pts.length >> 1].x - focus.x, e.pts[e.pts.length >> 1].z - focus.z) < maxD + e.len / 2);
@@ -360,7 +384,7 @@ class VehicleSystem {
   }
   // Polizeihubschrauber (kinematisch) ab 4 Sternen
   updatePoliceHeli(dt) {
-    if (Wanted.level >= 4 && GS.playing && !this.heli) { const f = Player.targetPos(); const h = this.spawn('heli', f.x + 200, f.z + 200, 0, { color: '#1d2b4a' }); h.pos.y = f.y + 80; h.policeHeli = true; h.rotorSpin = 1; h.setOccupant(DriverPool.get({ skin: pick(SKINS), shirt: '#1d2b4a', pants: '#1a2238', hair: '#111', hairStyle: 'cap' })); h.occupant._pool = true; this.heli = h; UI.notify('🚁 Polizeihubschrauber im Anflug!'); }
+    if (Wanted.level >= 4 && GS.playing && !this.heli) { const f = Player.targetPos(); const h = this.spawn('polmav', f.x + 200, f.z + 200, 0, { color: '#1d2b4a' }); h.pos.y = f.y + 80; h.policeHeli = true; h.rotorSpin = 1; h.setOccupant(DriverPool.get({ skin: pick(SKINS), shirt: '#1d2b4a', pants: '#1a2238', hair: '#111', hairStyle: 'cap' })); h.occupant._pool = true; this.heli = h; UI.notify('🚁 Polizeihubschrauber im Anflug!'); }
     const h = this.heli; if (!h) return; if (h.dead || h.removed) { if (h.dead && h.deadT > 10) { this.remove(h); } if (h.removed || h.deadT > 10) this.heli = null; return; }
     if (Wanted.level < 3) { h.vel.set(0, 8, 0); h.pos.addScaledVector(h.vel, dt); if (h.camDist() > 500) { this.remove(h); this.heli = null; } return; }
     const t = Player.targetPos(), want = tmpV2.set(t.x + Math.sin(GameTime * 0.3) * 35, Math.max(t.y, terrainHeight(t.x, t.z)) + 32, t.z + Math.cos(GameTime * 0.3) * 35);
@@ -368,20 +392,118 @@ class VehicleSystem {
     h.vel.lerp(dv, 1 - Math.exp(-dt * 1.2)); h.pos.addScaledVector(h.vel, dt); h.pos.y = Math.max(h.pos.y, groundHeight(h.pos.x, h.pos.z) + 15);
     const face = Math.atan2(t.x - h.pos.x, t.z - h.pos.z); h.yaw = turnToward(h.yaw, face, dt * 1.5); h.pitch = clamp(h.vel.dot(tmpV4.set(Math.sin(h.yaw), 0, Math.cos(h.yaw))) * 0.012, -0.3, 0.3);
     h.q.setFromEuler(tmpE.set(h.pitch, h.yaw, 0, 'YXZ')); h.m.rotor.rotation.y += dt * 28; h.m.tailRotor.rotation.x += dt * 40; h.sirenOn = true;
-    h.shootT = (h.shootT || 2) - dt; if (h.shootT <= 0 && dist < 90 && hasLOS(tmpV4.copy(h.pos).setY(h.pos.y - 1), tmpV5.set(t.x, t.y + 1, t.z))) { h.shootT = rand(0.25, 0.5); Wanted.spot(); NPCS.enemyShoot(tmpV4.copy(h.pos).setY(h.pos.y - 1), 6, 0.22); }
+    h.shootT = (h.shootT || 2) - dt; if (h.shootT <= 0 && dist < 90 && hasLOS(V3(h.pos.x, h.pos.y - 1, h.pos.z), V3(t.x, t.y + 1, t.z))) { h.shootT = rand(0.25, 0.5); Wanted.spot(); NPCS.enemyShoot(tmpV4.copy(h.pos).setY(h.pos.y - 1), 6, 0.22); }
+  }
+  // ---------- BOOTSVERKEHR: KI-Boote fahren frei über tiefes Wasser, weichen Untiefen und anderen Booten aus ----------
+  waterOK(x, z, dep) { const B = WS - 80; return Math.abs(x) < B && Math.abs(z) < B && terrainHeight(x, z) < -dep; }
+  waterLine(x0, z0, x1, z1, dep) { const n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 12)); for (let i = 1; i <= n; i++) if (!this.waterOK(lerp(x0, x1, i / n), lerp(z0, z1, i / n), dep)) return false; return true; }
+  boatType(x, z) {
+    if (Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r * 1.1) return 'airboat';
+    if (Math.hypot(x - PORT.x, z - PORT.z) < 650 && Math.random() < 0.5) return pick(['tug', 'fishing', 'tug']);
+    return pickW([['speedboat', 3], ['sailboat', 3], ['yacht', 1.2], ['fishing', 1.4], ['catamaran', 1.6], ['jetski', 1.2], ['dinghy', 1], ['tug', 0.4]]);
+  }
+  boatDepth(type) { return type === 'airboat' ? -0.4 : (CFG.VEHICLES[type].draft ?? 0.6) + 2; }
+  spawnBoat(focus) {
+    for (let t = 0; t < 10; t++) { const a = Math.random() * Math.PI * 2, d = rand(200, 520), x = focus.x + Math.cos(a) * d, z = focus.z + Math.sin(a) * d, type = this.boatType(x, z), dep = this.boatDepth(type);
+      if (!this.waterOK(x, z, Math.max(dep, type === 'airboat' ? -0.4 : 3)) || camera.position.distanceTo(tmpV1.set(x, camera.position.y, z)) < 170) continue;
+      if (this.list.some(v => Math.abs(v.pos.x - x) < 45 && Math.abs(v.pos.z - z) < 45)) continue;
+      const v = this.spawn(type, x, z, Math.random() * Math.PI * 2); v.ai = { mode: 'boat', tgt: null, retT: 0, stuckT: 0, revT: 0, cruise: type === 'jetski' || type === 'speedboat' ? rand(0.6, 0.95) : rand(0.45, 0.8), panic: 0, depth: dep, side: 0 }; v.driver = 'ai';
+      v.setOccupant(DriverPool.get(randomLook('civ'))); v.occupant._pool = true; return v; }
+    return null;
+  }
+  // Lenken zum Punkt (tx,tz): Sonden voraus erkennen Land, andere Boote werden umfahren, bei Festfahren kurz rückwärts
+  steerBoat(v, ai, tx, tz, thr, dt) {
+    const inp = v.aiInp || (v.aiInp = { ...NOINPUT }); Object.assign(inp, NOINPUT); const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw), dep = ai.depth;
+    let want = Math.atan2(tx - v.pos.x, tz - v.pos.z), block = false; const look = v.halfL + 12 + Math.abs(v.vF || 0) * 2.2;
+    if (!this.waterOK(v.pos.x + fx * look, v.pos.z + fz * look, dep)) { block = true; const ok = (da) => this.waterOK(v.pos.x + Math.sin(v.yaw + da) * look, v.pos.z + Math.cos(v.yaw + da) * look, dep), l = ok(0.7), r = ok(-0.7);
+      if (!ai.side) ai.side = Math.random() < 0.5 ? 1 : -1; want = v.yaw + (l && !r ? 1.2 : r && !l ? -1.2 : ai.side * 1.6); } else ai.side = 0;
+    for (const o of this.list) { if (o === v || (!o.boat && !(o.air && o.pos.y < 3))) continue; const dx = o.pos.x - v.pos.x, dz = o.pos.z - v.pos.z, ahead = dx * fx + dz * fz, lat = dx * fz - dz * fx;
+      if (ahead > 0 && ahead < v.halfL + o.halfL + 22 && Math.abs(lat) < v.halfW + o.halfW + 5) { want = v.yaw - Math.sign(lat || 1) * 0.9; thr *= o === Player.vehicle && ai.mode !== 'polboat' ? 0.4 : 0.8; break; } }
+    const diff = wrapAngle(want - v.yaw); inp.steer = clamp(diff * 1.8, -1, 1); inp.throttle = thr * (Math.abs(diff) > 1.2 ? 0.45 : 1) * (block ? 0.55 : 1);
+    if (v.hspeed < 0.7 && inp.throttle > 0.25) ai.stuckT += dt; else ai.stuckT = Math.max(0, ai.stuckT - dt);
+    if (ai.stuckT > 3) { ai.revT = 2.5; ai.stuckT = 0; ai.tgt = null; }
+    if (ai.revT > 0) { ai.revT -= dt; inp.throttle = 0; inp.brake = 1; inp.steer = -inp.steer; }
+    return inp;
+  }
+  updateBoatAI(v, dt) {
+    const ai = v.ai; ai.retT -= dt; if (ai.panic > 0) ai.panic -= dt;
+    if (!ai.tgt || ai.retT <= 0 || Math.hypot(ai.tgt.x - v.pos.x, ai.tgt.z - v.pos.z) < 30 + v.halfL) { ai.tgt = null;
+      for (let t = 0; t < 14 && !ai.tgt; t++) { const a = v.yaw + rand(-1.5, 1.5) * (t < 9 ? 1 : 2.1), d = rand(120, 420), x = v.pos.x + Math.sin(a) * d, z = v.pos.z + Math.cos(a) * d; if (this.waterLine(v.pos.x, v.pos.z, x, z, ai.depth)) ai.tgt = V3(x, 0, z); }
+      if (!ai.tgt) ai.tgt = V3(v.pos.x - Math.sin(v.yaw) * 60, 0, v.pos.z - Math.cos(v.yaw) * 60); ai.retT = rand(25, 55); }
+    return this.steerBoat(v, ai, ai.tgt.x, ai.tgt.z, ai.panic > 0 ? 1 : ai.cruise, dt);
+  }
+  // Küstenwache: verfolgt das Spielerboot, rammt und schießt ab 2 Sternen
+  spawnPoliceBoat(focus) {
+    for (let t = 0; t < 14; t++) { const a = Math.random() * Math.PI * 2, d = rand(140, 280), x = focus.x + Math.cos(a) * d, z = focus.z + Math.sin(a) * d; if (!this.waterOK(x, z, 2.6) || this.list.some(v => Math.abs(v.pos.x - x) < 25 && Math.abs(v.pos.z - z) < 25)) continue;
+      const v = this.spawn('policeboat', x, z, Math.atan2(focus.x - x, focus.z - z)); v.ai = { mode: 'polboat', tgt: null, retT: 0, stuckT: 0, revT: 0, cruise: 1, panic: 0, depth: 1.4, side: 0, shootT: 2 }; v.driver = 'ai'; v.sirenOn = true;
+      v.setOccupant(DriverPool.get({ skin: pick(SKINS), shirt: '#1d2b4a', pants: '#1a2238', hair: '#111a33', hairStyle: 'cap' })); v.occupant._pool = true; return v; }
+    return null;
+  }
+  updatePoliceBoat(v, dt) {
+    const ai = v.ai; if (Wanted.level === 0) { v.sirenOn = false; ai.mode = 'boat'; ai.cruise = 0.55; ai.tgt = null; return this.updateBoatAI(v, dt); }
+    const t = Player.targetPos(), pv = Player.vehicle, lead = pv ? 1.1 : 0, tx = t.x + (pv ? pv.vel.x * lead : 0), tz = t.z + (pv ? pv.vel.z * lead : 0), d = Math.hypot(t.x - v.pos.x, t.z - v.pos.z);
+    if (d < 120) Wanted.spot();
+    ai.shootT -= dt; if (Wanted.level >= 2 && ai.shootT <= 0 && d < 75 && !v.dead) { ai.shootT = rand(0.45, 0.9); const o = V3(v.pos.x, v.pos.y + 1.6, v.pos.z); if (hasLOS(o, V3(t.x, t.y + 1, t.z))) NPCS.enemyShoot(o, 5, 0.3); }
+    return this.steerBoat(v, ai, tx, tz, d > 45 ? 1 : clamp(d / 45, 0.35, 1), dt);
+  }
+  // ---------- LUFTVERKEHR (kinematisch): Rundflug-Helis, Kleinflugzeuge, Zeppelin, Jet-Überflüge ----------
+  airPOIs() { return [LOC.plaza, LOC.beach, LOC.stadium, LOC.marina, LOC.summit, LOC.lighthouse, LOC.oldPlaza, LOC.cbdPark, LOC.golf, LOC.pier, LOC.hospital, V3(DOWNTOWN.x, 0, DOWNTOWN.z)].filter(Boolean); }
+  spawnAir(kind, focus) {
+    const L = this.airL, ang = Math.random() * Math.PI * 2, mk = (type, x, z, yaw, color) => { const v = this.spawn(type, x, z, yaw, { color }); v.driver = 'ai'; v.amb = true; v.rotorSpin = 1; v.onGround = false; v.thr = 0.75; v.setOccupant(DriverPool.get(randomLook('civ'))); v.occupant._pool = true; return v; };
+    if (kind === 'blimp') { const P = this.airPOIs(); let c = P[0], bd = 1e9; for (const p of P) { const d = Math.hypot(p.x - focus.x, p.z - focus.z) + (p === LOC.summit ? 5e3 : 0); if (d < bd) { bd = d; c = p; } }
+      const r = rand(320, 460), x = c.x + Math.cos(ang) * r, z = c.z + Math.sin(ang) * r, v = mk('blimp', x, z, 0); v.pos.y = Math.max(terrainHeight(x, z), 0) + 170;
+      L.push({ v, kind, c: V3(c.x, 0, c.z), r, ang, w: 9 / r * (Math.random() < 0.5 ? 1 : -1), sp: 9, alt: 175, clear: 120, tr: 0.15, maxD: 2600 }); return; }
+    if (kind === 'heli') { const d = rand(700, 1000), x = focus.x + Math.cos(ang) * d, z = focus.z + Math.sin(ang) * d, P = this.airPOIs(), near = P.filter(p => Math.hypot(p.x - focus.x, p.z - focus.z) < 1100), wp = pick(near.length ? near : P);
+      const type = Math.random() < 0.25 ? 'polmav' : 'newsheli', v = mk(type, x, z, Math.atan2(wp.x - x, wp.z - z), type === 'polmav' ? '#1d2b4a' : pick(['#f4f4f4', '#1e6fd0', '#c1121f', '#141414', '#ffcc00', '#2a7a3a'])); v.pos.y = Math.max(terrainHeight(x, z), 0) + 150;
+      L.push({ v, kind, wp: V3(wp.x, 0, wp.z), sp: rand(28, 36), alt: rand(130, 170), clear: 95, tr: 0.55, maxD: 1900, hover: 0 }); return; }
+    if (kind === 'small') { const type = pickW([['plane', 3], ['biplane', 2], ['seaplane', 2], ['bizjet', 1.5], ['cargo', 1]]), sp = { plane: 48, biplane: 40, seaplane: 46, bizjet: 95, cargo: 68 }[type], d = 1500, x = focus.x + Math.cos(ang) * d, z = focus.z + Math.sin(ang) * d;
+      const tx = focus.x + rand(-450, 450), tz = focus.z + rand(-450, 450), yaw = Math.atan2(tx - x, tz - z), v = mk(type, x, z, yaw); const alt = type === 'bizjet' ? rand(380, 520) : rand(230, 380); v.pos.y = alt;
+      L.push({ v, kind, dir: V3(Math.sin(yaw), 0, Math.cos(yaw)), sp, alt, clear: 140, tr: 0.3, maxD: 1900, wob: rand(0, 6) }); return; }
+    if (kind === 'jets') { const d = 1900, x = focus.x + Math.cos(ang) * d, z = focus.z + Math.sin(ang) * d, tx = focus.x + rand(-250, 250), tz = focus.z + rand(-250, 250), yaw = Math.atan2(tx - x, tz - z), alt = rand(240, 320), sx = Math.cos(yaw), sz = -Math.sin(yaw);
+      for (const k of [0, 1]) { const v = mk('jet', x + sx * k * 22 - Math.sin(yaw) * k * 18, z + sz * k * 22 - Math.cos(yaw) * k * 18, yaw); v.pos.y = alt + k * 4; L.push({ v, kind, dir: V3(Math.sin(yaw), 0, Math.cos(yaw)), sp: 150, alt: alt + k * 4, clear: 160, tr: 0.25, maxD: 2300, wob: 0 }); } }
+  }
+  flyAmb(a, dt) {
+    const v = a.v; let tx, tz;
+    if (a.kind === 'blimp') { a.ang += a.w * dt; tx = a.c.x + Math.cos(a.ang + Math.sign(a.w) * 0.25) * a.r; tz = a.c.z + Math.sin(a.ang + Math.sign(a.w) * 0.25) * a.r; }
+    else if (a.wp) { if (Math.hypot(a.wp.x - v.pos.x, a.wp.z - v.pos.z) < 90) { const P = this.airPOIs(), f = Player.targetPos(), near = P.filter(p => Math.hypot(p.x - f.x, p.z - f.z) < 1100 && Math.hypot(p.x - a.wp.x, p.z - a.wp.z) > 200); const q = pick(near.length ? near : P); a.wp.set(q.x, 0, q.z); } tx = a.wp.x; tz = a.wp.z; }
+    else { a.wob += dt * 0.07; tx = v.pos.x + (a.dir.x + Math.sin(a.wob) * a.dir.z * 0.15) * 600; tz = v.pos.z + (a.dir.z - Math.sin(a.wob) * a.dir.x * 0.15) * 600; }
+    const dy = wrapAngle(Math.atan2(tx - v.pos.x, tz - v.pos.z) - v.yaw), turn = clamp(dy, -1, 1) * a.tr; v.yaw += turn * dt;
+    const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw), aim = Math.max(a.alt, terrainHeight(v.pos.x + fx * 200, v.pos.z + fz * 200) + a.clear, terrainHeight(v.pos.x, v.pos.z) + a.clear), vy = clamp((aim - v.pos.y) * 0.25, -4, 6);
+    v.vel.set(fx * a.sp, vy, fz * a.sp); v.pos.addScaledVector(v.vel, dt);
+    const bank = a.kind === 'blimp' ? 0 : clamp(-turn * a.sp * (v.cls === 'heli' ? 0.012 : 0.05), -0.6, 0.6); v.roll = damp(v.roll, bank, 2, dt);
+    v.pitch = v.cls === 'heli' ? (a.kind === 'blimp' ? -vy * 0.02 : 0.12) : -vy * 0.02; v.q.setFromEuler(tmpE.set(v.pitch, v.yaw, v.roll, 'YXZ')); v.axes(); v.spd = a.sp; v.thr = 0.75;
+    if (v.m.rotor) v.m.rotor.rotation.y += dt * 28; if (v.m.rotor2) v.m.rotor2.rotation.y -= dt * 24; if (v.m.tailRotor) v.m.tailRotor.rotation.x += dt * 40; if (v.m.prop) v.m.prop.rotation.z += dt * 50; for (const p of v.m.props) p.rotation.z += dt * (a.kind === 'blimp' ? 14 : 50);
+    if (v.m.gear) v.m.gear.visible = false;
+  }
+  updateAirTraffic(dt, focus) {
+    const L = this.airL || (this.airL = []); this.airT = (this.airT ?? 2) - dt; this.jetT = (this.jetT ?? rand(90, 160)) - dt;
+    if (this.airT <= 0) { this.airT = 2; const n = (k) => L.filter(a => a.kind === k).length, lo = Q().traffic < 12;
+      if (!n('blimp')) this.spawnAir('blimp', focus); else if (n('heli') < (lo ? 1 : 2)) this.spawnAir('heli', focus); else if (n('small') < (lo ? 1 : 2)) this.spawnAir('small', focus);
+      if (this.jetT <= 0 && !n('jets')) { this.jetT = rand(150, 280); this.spawnAir('jets', focus); } }
+    for (let i = L.length - 1; i >= 0; i--) { const a = L[i], v = a.v;
+      if (v.removed) { L.splice(i, 1); continue; }
+      if (v.dead || v.health <= 0 || v.driver !== 'ai') { // abgeschossen oder gekapert → normale Physik übernimmt
+        if (!v.dead && v.health <= 0) v.explode(v.lastPlayerHit > GameTime - 6); if (v.driver === 'ai') v.driver = null; v.amb = false; v.rotorSpin = 0.25; v.thr = 0; v.vel.y = Math.min(v.vel.y, -2); L.splice(i, 1); continue; }
+      this.flyAmb(a, dt);
+      if (Math.hypot(v.pos.x - focus.x, v.pos.z - focus.z) > a.maxD) { this.remove(v); L.splice(i, 1); } }
+  }
+  boatTraffic(focus) {
+    const pv = Player.vehicle, high = pv && pv.air && pv.pos.y - terrainHeight(pv.pos.x, pv.pos.z) > 150, boats = this.list.filter(v => v.ai && v.ai.mode === 'boat').length, want = Math.round(Math.min(7, Q().traffic / 3) * Admin.trafficMul);
+    if (boats < want && !high) this.spawnBoat(focus);
   }
   update(dt, focus) {
     for (const v of this.list) {
       if (v.policeHeli) { if (v.dead) { v.deadT += dt; v.vel.y -= 9.8 * dt; v.pos.addScaledVector(v.vel, dt); if (v.pos.y < groundHeight(v.pos.x, v.pos.z)) { v.pos.y = groundHeight(v.pos.x, v.pos.z); v.vel.set(0, 0, 0); } } v.updateVisual(dt); continue; }
-      if (v.ai) v.input = v.ai.mode === 'police' ? this.updatePolice(v, dt) : this.updateTraffic(v, dt);
+      if (v.amb) { v.updateVisual(dt); continue; }
+      if (v.ai) { const md = v.ai.mode; v.input = md === 'police' ? this.updatePolice(v, dt) : md === 'boat' ? this.updateBoatAI(v, dt) : md === 'polboat' ? this.updatePoliceBoat(v, dt) : this.updateTraffic(v, dt); }
       else if (v.driver !== Player.active || !GS.playing || Admin.open) v.input = v.air ? NOINPUT : PARKINPUT;
       v.update(dt, v.input);
       if (!v.dead && v.health <= 0) { v.burnT -= dt; if (v.burnT <= 0) v.explode(v.lastPlayerHit > GameTime - 6); }
       if (v.dead) v.deadT += dt;
     }
-    this.updatePoliceHeli(dt);
+    this.updatePoliceHeli(dt); this.updateAirTraffic(dt, focus);
     this.collisions();
-    for (const v of this.list) if (!v.policeHeli) { const far = v.camDist() > 450; v.group.visible = !far || v.air; if (!far || v.air) v.updateVisual(dt); }
+    for (const v of this.list) if (!v.policeHeli && !v.amb) { const far = v.camDist() > (v.boat ? 900 : 450); v.group.visible = !far || v.air; if (!far || v.air) v.updateVisual(dt); }
     this.spawnT -= dt;
     if (this.spawnT <= 0) {
       this.spawnT = 0.5;
@@ -389,14 +511,15 @@ class VehicleSystem {
       const pv = Player.vehicle; const high = pv && pv.air && pv.pos.y - terrainHeight(pv.pos.x, pv.pos.z) > 150;
       if (traffic < want && !high) { const p = this.roadSpawn(focus, 90, 240); if (p) { const type = pickW(TRAFFIC_MIX);
         const v = this.spawn(type, p.x, p.z, p.yaw); this.makeAI(v, 'traffic', p.e, p.dir, p.s); v.ai.k = Math.round(p.s / p.e.len * (p.e.pts.length - 1)); v.setOccupant(DriverPool.get(randomLook('civ'))); v.occupant._pool = true; v.vel.set(Math.sin(p.yaw) * 10, 0, Math.cos(p.yaw) * 10); } }
+      this.boatTraffic(focus);
       for (const v of [...this.list]) {
         const d = Math.hypot(v.pos.x - focus.x, v.pos.z - focus.z);
-        if (v === Player.vehicle || v.driver instanceof Character || v.mission || v === this.heli) continue;
-        if (v.persistent) { if (((v.dead && v.deadT > 40) || (v.sinking && v.deadT > 6)) && d > 200 && v.spawnPoint) { const sp = v.spawnPoint; this.remove(v); this.spawn(sp.type, sp.x, sp.z, sp.yaw, { persistent: true, color: sp.color, spawnPoint: sp }); } continue; }
-        if (d > (v.ai && v.ai.mode === 'police' ? 400 : 330) || (v.sinking && v.deadT > 6) || (v.dead && v.deadT > 45 && d > 60)) this.remove(v);
+        if (v === Player.vehicle || v.driver instanceof Character || v.mission || v === this.heli || v.amb) continue;
+        if (v.persistent) { if (((v.dead && v.deadT > 40) || (v.sinking && v.deadT > 6)) && d > 200 && v.spawnPoint) { const sp = v.spawnPoint; this.remove(v); const nv = this.spawn(sp.type, sp.x, sp.z, sp.yaw, { persistent: true, color: sp.color || undefined, spawnPoint: sp }); if (sp.y != null) nv.pos.y = sp.y; } continue; }
+        if (d > (v.ai ? ({ police: 400, boat: 720, polboat: 520 })[v.ai.mode] || 330 : 330) || (v.sinking && v.deadT > 6) || (v.dead && v.deadT > 45 && d > 60)) this.remove(v);
         else if (!v.ai && !v.driver && d > 250 && !v.dead) this.remove(v);
       }
-      if (Wanted.level > 0 && GS.playing) { const need = [0, 1, 2, 3, 4, 6][Wanted.level], have = this.list.filter(v => v.ai && v.ai.mode === 'police' && !v.dead).length; this.copT -= 0.5; if (have < need && this.copT <= 0) { this.copT = 2.5; this.spawnPolice(focus); } }
+      if (Wanted.level > 0 && GS.playing) { const wet = (Player.vehicle && Player.vehicle.boat) || Player.active.swim, need = (wet ? [0, 1, 1, 2, 2, 3] : [0, 1, 2, 3, 4, 6])[Wanted.level], have = this.list.filter(v => v.ai && v.ai.mode === (wet ? 'polboat' : 'police') && !v.dead).length; this.copT -= 0.5; if (have < need && this.copT <= 0) { this.copT = 2.5; if (wet) this.spawnPoliceBoat(focus); else this.spawnPolice(focus); } }
     }
   }
   collisions() {
@@ -419,7 +542,7 @@ class VehicleSystem {
     }
   }
   circles(v) { const r = v.halfW + 0.05, off = Math.max(0, v.halfL - r), s = Math.sin(v.yaw), c = Math.cos(v.yaw); const out = [[v.pos.x + s * off, v.pos.z + c * off, r], [v.pos.x - s * off, v.pos.z - c * off, r]]; if (off > r) out.push([v.pos.x, v.pos.z, r]); return out; }
-  panicAround(pos, r) { for (const v of this.list) if (v.ai && v.ai.mode === 'traffic' && v.pos.distanceTo(pos) < r) v.ai.panic = Math.max(v.ai.panic, rand(4, 8)); }
+  panicAround(pos, r) { for (const v of this.list) if (v.ai && (v.ai.mode === 'traffic' || v.ai.mode === 'boat') && v.pos.distanceTo(pos) < r) v.ai.panic = Math.max(v.ai.panic, rand(4, 8)); }
 }
 // Verkehrsmix: viele Modelle, realistisch gewichtet (Kleinwagen & Limousinen häufig, Lkw selten)
 const TRAFFIC_MIX = [['sedan', 12], ['compact', 7], ['sedan2', 10], ['hatch', 7], ['sportsedan', 4], ['taxi', 5], ['taxi2', 4], ['suv', 7], ['suv2', 7], ['luxsuv', 4], ['pickup', 7], ['van', 6], ['boxtruck', 3], ['flatbed', 2], ['stakebed', 1.5], ['sport', 4], ['muscle', 4], ['bike', 6], ['garbage', 0.8], ['ambulance', 0.8]];

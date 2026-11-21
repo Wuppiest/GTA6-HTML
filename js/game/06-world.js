@@ -478,13 +478,13 @@ function buildSpecials() {
       for (const x of [-w / 2 - 0.2, w / 2 + 0.2]) PG(F, x, 0.2, d / 2 - 0.4, 0.15, 22, 0.15, '#ff3030'); PB(F, 0, 0.2, d / 2 + 3, 12, 0.3, 6, '#f0f0f0'); PB(F, 0, 4, d / 2 + 3, 14, 0.4, 7, '#d8e0e8');
       signF(F, 'HOSPITAL', '#ff3030', 0, 18, d / 2 + 0.3, 16, 3.6); signF(F, '+', '#ff2020', -w / 2 + 4, 12, d / 2 + 0.3, 4, 4); PC(F, w * 0.25, 22.2, -d * 0.2, 6, 0.15, '#5a5e64', { seg: 16 }); PB(F, w * 0.25 - 1.4, 22.36, -d * 0.2, 0.4, 0.02, 3.5, '#ffffff'); PB(F, w * 0.25 + 1.4, 22.36, -d * 0.2, 0.4, 0.02, 3.5, '#ffffff'); PB(F, w * 0.25, 22.36, -d * 0.2, 2.4, 0.02, 0.4, '#ffffff');
       return { top: 22.2, flat: true }; });
-    LOC.hospital = L.front; LOC.hospital.yaw = L.yaw; { const ap = lotPoint(L, -L.w / 2 + 6, L.d / 2 + 2.5); PARKED.push(['ambulance', ap.x, ap.z, L.yaw + Math.PI / 2]); } PICKUP_SPOTS.push(['health', L.front.x, L.front.z]); }
+    LOC.hospital = L.front; LOC.hospital.yaw = L.yaw; { const ap = lotPoint(L, -L.w / 2 + 6, L.d / 2 + 2.5); PARKED.push(['ambulance', ap.x, ap.z, L.yaw + Math.PI / 2]); const hp = lotPoint(L, L.w * 0.25, -L.d * 0.2); PARKED.push(['newsheli', hp.x, hp.z, L.yaw, '#f4f4f4', L.y + 22.22]); } PICKUP_SPOTS.push(['health', L.front.x, L.front.z]); }
   // Polizei-Hauptquartier
   L = specialLot(DOWNTOWN.x + 110, DOWNTOWN.z + 120, 46, 30);
   if (L) { const F = placeBuilding(L, (F, w, d) => { PB(F, 0, -2, 0, w + 0.4, 2.3, d + 0.4, '#8a8378'); PB(F, 0, 0.2, -4, w, 14, d - 8, '#dfe6ef'); facade(F, w, d - 8, 0.4, 4, 3.4, { sp: 3, ww: 2, wh: 1.4, door: 0, day: '#4a6a8a' });
       PB(F, 0, 0.2 + 14, -4, w + 0.3, 0.8, d - 7.7, '#1f3a6a'); PG(F, 0, 14.6, d / 2 - 7.8, w, 0.15, 0.1, '#2a6aff'); PB(F, 0, 0, d / 2 - 4, w, 0.12, 8, '#4a4a4e'); parkLines(F, -w / 2 + 3, w / 2 - 3, d / 2 - 4, 5);
       for (let i = 0; i < 5; i++) PC(F, -w / 2 + 3 + i * 1.5, 0, d / 2 - 0.5, 0.15, 0.9, '#2a6aff'); signF(F, 'POLICE', '#3a7bff', 0, 10.5, d / 2 - 7.7, 14, 3.4); return { top: 15, flat: true, depthUsed: d }; });
-    LOC.police = L.front; LOC.police.yaw = L.yaw; PICKUP_SPOTS.push(['armor', L.front.x, L.front.z]); const pp = lotPoint(L, -6, L.d / 2 - 4); PARKED.push(['police', pp.x, pp.z, L.yaw + Math.PI]); const pp2 = lotPoint(L, 4, L.d / 2 - 4); PARKED.push(['police', pp2.x, pp2.z, L.yaw + Math.PI]); }
+    LOC.police = L.front; LOC.police.yaw = L.yaw; PICKUP_SPOTS.push(['armor', L.front.x, L.front.z]); const pp = lotPoint(L, -6, L.d / 2 - 4); PARKED.push(['police', pp.x, pp.z, L.yaw + Math.PI]); const pp2 = lotPoint(L, 4, L.d / 2 - 4); PARKED.push(['police', pp2.x, pp2.z, L.yaw + Math.PI]); const ph = lotPoint(L, 0, -4); PARKED.push(['polmav', ph.x, ph.z, L.yaw + Math.PI / 2, '#1d2b4a', L.y + 15.02]); }
   // Kais Safehouse
   L = specialLot(SUBURB.x + 20, SUBURB.z - 20, 20, 22);
   if (L) { placeBuilding(L, (F, w, d) => { const r = bHouse(F, 13, 11, L, { wall: '#f8f0e0', noCar: true }); Signs.quad(F, -3.5, 2.6, 5.6, 1.6, 0.4, 0, Signs.cell('KAI', '#1fb5a8', '#fff')); return Object.assign(r, { obbW: 13, obbD: 11 }); });
@@ -589,7 +589,8 @@ function buildBase() {
   const fence = (x0, z0, x1, z1) => fenceLine(x0, z0, x1, z1, 4, 3, '#8a8f94', '#a0a4a8', [1, 2, 2.9]);
   fence(fx0, fz0, fx1, fz0); fence(fx0, fz1, fx1, fz1); fence(fx0, fz0, fx0, fz1); fence(fx1, fz0, fx1, bz + 40); fence(fx1, bz + 80, fx1, fz1);
   addSign('SOLARA AIR BASE', '#ffb03a', fx1 + 1, y + 7, bz + 60, Math.PI / 2, 16, 3);
-  PARKED.push(['jet', bx + 25, bz - 60, -Math.PI / 2], ['jet', bx + 25, bz - 20, -Math.PI / 2], ['plane', bx + 25, bz + 40, -Math.PI / 2], ['heli', LOC.helipads[0].x, LOC.helipads[0].z, -Math.PI / 2], ['heli', LOC.helipads[1].x, LOC.helipads[1].z, -Math.PI / 2, '#1d2b4a']);
+  PARKED.push(['jet', bx + 25, bz - 60, -Math.PI / 2], ['jet', bx + 25, bz - 20, -Math.PI / 2], ['plane', bx + 25, bz + 40, -Math.PI / 2], ['heli', LOC.helipads[0].x, LOC.helipads[0].z, -Math.PI / 2], ['heli', LOC.helipads[1].x, LOC.helipads[1].z, -Math.PI / 2, '#1d2b4a'],
+    ['cargo', bx + 25, bz - 135, -Math.PI / 2], ['biplane', bx + 25, bz + 80, -Math.PI / 2], ['bizjet', bx + 25, bz + 125, -Math.PI / 2], ['attackheli', bx + 55, bz + 80, -Math.PI / 2], ['cargoheli', bx + 55, bz + 138, -Math.PI / 2]);
   PICKUP_SPOTS.push(['armor', bx + 60, bz + 200], ['ammo', bx + 60, bz + 205]);
 }
 
@@ -625,7 +626,9 @@ function buildCoast() {
     LOC.boats.push(base.clone().addScaledVector(dir, 25).addScaledVector(side, 8), base.clone().addScaledVector(dir, 50).addScaledVector(side, -8)); }
   { const F = FR(mp.x - dir.x * 22, terrainHeight(mp.x - dir.x * 22, mp.z - dir.z * 22), mp.z - dir.z * 22, myaw); PB(F, 0, -1, 0, 18, 6, 10, '#f4f0e8'); PW(F, 0, 2.2, 5.03, 14, 2.2, 0, 0xfff0c8, '#7aa0c0'); part(F, G.pyr(), 0, 5, 0, 20, 2.4, 12, '#1f6fd0'); Signs.quad(F, 0, 4.3, 5.1, 8, 1, 0, Signs.cell('SOLARA MARINA', '#0a4a6a', '#fff', 2)); const p2 = LP(F, 0, 0, 0); World.addOBB(p2.x, p2.z, 9, 5, myaw, p2.y + 7); }
   PARKED.push(['speedboat', LOC.boats[0].x, LOC.boats[0].z, myaw], ['yacht', LOC.boats[3].x + dir.x * 10, LOC.boats[3].z + dir.z * 10, myaw], ['fishing', LOC.boats[5].x, LOC.boats[5].z, myaw],
-    ['jetski', LOC.boats[6].x, LOC.boats[6].z, myaw], ['speedboat', LOC.boats[8].x, LOC.boats[8].z, myaw, '#0d3b66'], ['jetski', LOC.boats[9].x, LOC.boats[9].z, myaw, '#22e4ff']);
+    ['jetski', LOC.boats[6].x, LOC.boats[6].z, myaw], ['speedboat', LOC.boats[8].x, LOC.boats[8].z, myaw, '#0d3b66'], ['jetski', LOC.boats[9].x, LOC.boats[9].z, myaw, '#22e4ff'],
+    ['sailboat', LOC.boats[1].x, LOC.boats[1].z, myaw], ['policeboat', LOC.boats[4].x, LOC.boats[4].z, myaw], ['catamaran', LOC.boats[7].x, LOC.boats[7].z, myaw]);
+  { const p = mp.clone().addScaledVector(side, 52).addScaledVector(dir, 80); if (terrainHeight(p.x, p.z) < -1) PARKED.push(['dinghy', p.x, p.z, myaw]); }
   // Hafen: Kaimauer, Kräne, Container, Frachter
   const pc = V3(PORT.x, 3, PORT.z + 40); let qz = pc.z; for (; qz < pc.z + 400; qz += 4) if (terrainHeight(pc.x, qz) < 0) break; LOC.quay = V3(pc.x, 3, qz - 12);
   PB(F0, pc.x, -6, qz - 2, 380, 9.05, 4, '#8a8a84'); for (let x = -180; x <= 180; x += 12) PC(F0, pc.x + x, 3.05, qz - 1.2, 0.35, 0.7, '#3a3a40');
@@ -653,6 +656,23 @@ function buildCoast() {
   World.addOBB(s.x + 25, s.z, 9, 9, 0, syy + 15); BLD.push({ x: s.x + 25, z: s.z, w: 18, d: 18, yaw: 0 });
   const tx = s.x - 25, tz = s.z + 12; for (let k = 0; k < 8; k++) { const r0 = lerp(3, 0.6, k / 8), r1 = lerp(3, 0.6, (k + 1) / 8), y0 = syy + k * 6, y1 = y0 + 6; for (const [a, b] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) seg(tx + a * r0, y0, tz + b * r0, tx + a * r1, y1, tz + b * r1, 0.25, 0.25, k % 2 ? '#d02020' : '#f0f0f0'); seg(tx + r0, y0, tz + r0, tx - r1, y1, tz + r1, 0.12, 0.12, '#bbb'); }
   const blink = new THREE.Mesh(new THREE.SphereGeometry(0.6, 6, 4), new THREE.MeshBasicMaterial({ color: 0xff2020, toneMapped: false })); blink.position.set(tx, syy + 48.5, tz); scene.add(blink); World.anim.push(() => { blink.visible = Math.floor(GameTime * 1.5) % 2 === 0; }); World.addOBB(tx, tz, 3, 3, 0, syy + 48);
+  parkCraft();
+}
+// freie Wasserstelle (Mindesttiefe dep) im Ring r0..r1, Bug zeigt zum tieferen Wasser
+function waterSpot(x, z, r0, r1, dep, away = []) {
+  for (let r = r0; r <= r1; r += 6) for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2 + r * 0.013, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+    if (terrainHeight(px, pz) >= -dep || away.some(q => Math.hypot(q.x - px, q.z - pz) < 26)) continue; let ok = true; for (const [dx, dz] of [[9, 0], [-9, 0], [0, 9], [0, -9]]) if (terrainHeight(px + dx, pz + dz) >= -dep * 0.6) ok = false; if (!ok) continue;
+    let by = 0, bh = 1e9; for (let j = 0; j < 12; j++) { const ya = j / 12 * Math.PI * 2, h = terrainHeight(px + Math.sin(ya) * 40, pz + Math.cos(ya) * 40); if (h < bh) { bh = h; by = ya; } } return { x: px, z: pz, yaw: by }; }
+  return null;
+}
+function parkCraft() {
+  const put = (type, p, color) => { if (p) PARKED.push([type, p.x, p.z, p.yaw, color]); return p; };
+  const mp = LOC.marina; put('seaplane', waterSpot(mp.x + 40, mp.z + 100, 0, 70, 2.2), '#ff7a1a');
+  const q = LOC.quay; if (q) { put('tug', waterSpot(q.x + 140, q.z + 32, 0, 70, 3.5)); put('tug', waterSpot(q.x - 140, q.z + 32, 0, 70, 3.5), '#1d2b4a'); }
+  if (LOC.swamp) { const sw = LOC.swamp, a = waterSpot(sw.x, sw.z, 6, 220, 0.25) || { x: sw.x + 10, z: sw.z + 10, yaw: 0 }; put('airboat', a); put('airboat', waterSpot(a.x, a.z, 8, 120, 0.25, [a]) || { x: sw.x - 12, z: sw.z + 14, yaw: 1 }, '#3a5a7a');
+    const F = FR(sw.x, terrainHeight(sw.x, sw.z), sw.z, Math.atan2(a.x - sw.x, a.z - sw.z)); PB(F, 0, -0.3, 0, 3.6, 0.5, 5, '#7a6a52'); Signs.quad(F, 0, 1.6, 2.6, 3.2, 0.7, 0, Signs.cell('GATOR TOURS', '#2f5a2a', '#ffe08a')); PB(F, -1.4, -0.3, 2.5, 0.15, 2.2, 0.15, '#5a4a3a'); PB(F, 1.4, -0.3, 2.5, 0.15, 2.2, 0.15, '#5a4a3a'); }
+  const b = LOC.beach; if (b) { const j1 = put('jetski', waterSpot(b.x, b.z, 30, 140, 1.2), '#ff2d95'); if (j1) { const j2 = put('jetski', waterSpot(j1.x, j1.z, 10, 60, 1.2, [j1]), '#ffe23a'); put('dinghy', waterSpot(j1.x, j1.z, 20, 90, 1.0, [j1, j2].filter(Boolean))); } }
+  const lh = LOC.lighthouse; if (lh) { const d = put('dinghy', waterSpot(lh.x, lh.z, 35, 160, 1.4), '#d81e2a'); if (d) put('sailboat', waterSpot(d.x, d.z, 20, 120, 2.6, [d]), '#2a6f97'); }
 }
 function container(F, x, y, z, ry, c) { const M = FRL(F, x, y, z, ry), dark = C3(c).clone().multiplyScalar(0.78); PB(M, 0, 0, 0, 2.45, 2.55, 12.2, c); if (Q().detail > 1) for (let k = -5.6; k <= 5.6; k += 0.8) { PB(M, 1.24, 0.1, k, 0.04, 2.35, 0.3, dark); PB(M, -1.24, 0.1, k, 0.04, 2.35, 0.3, dark); } PB(M, 0, 0.1, 6.11, 2.3, 2.35, 0.04, dark); PB(M, 0.4, 0.2, 6.15, 0.06, 2.1, 0.06, '#555'); PB(M, -0.4, 0.2, 6.15, 0.06, 2.1, 0.06, '#555'); }
 

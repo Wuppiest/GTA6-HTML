@@ -533,7 +533,7 @@ function hullGeos(L, W, top, keel, o = {}) {
 const _boatCache = {};
 function boatGeos(type) {
   if (_boatCache[type]) return _boatCache[type];
-  const S = CFG.VEHICLES[type], L = S.len, W = S.wid, k = new Kit(), white = '#f6f6f2', dark = '#1d1e22', teak = '#b0804a', chrome = '#d0d4d8'; let seat, pose = 'sit', height = 2;
+  const S = CFG.VEHICLES[type], L = S.len, W = S.wid, k = new Kit(), white = '#f6f6f2', dark = '#1d1e22', teak = '#b0804a', chrome = '#d0d4d8'; let seat, pose = 'sit', height = 2, extra = {};
   const hull = (top, keel, hullC, o) => { const h = hullGeos(L, W, top, keel, o); hullC === 'paint' ? k.raw('paint', h.hull) : k.raw('vc', h.hull, hullC); k.raw('vc', h.deck, o && o.deckC || teak); hullC === 'paint' ? k.raw('paint', h.transom) : k.raw('vc', h.transom, hullC); };
   if (type === 'jetski') {
     hull(0.42, 0.28, 'paint', { bow: 0.5, sheer: 0.25, deckC: '#2a2c30' }); k.box('vc', W * 0.75, 0.06, L * 0.6, 0, 0.12, -0.1, '#f4f4f0');
@@ -563,6 +563,56 @@ function boatGeos(type) {
     k.box('vc', W * 0.6, 0.25, 2.2, 0, 2.3, L / 2 - 3.5, '#f0ece2'); k.box('vc', W * 0.8, 0.15, 1.6, 0, 0.6, -L / 2 - 0.6, teak);
     k.box('head', 0.25, 0.12, 0.05, 0, 2.2, L / 2 - 0.3); k.box('tail', 0.2, 0.12, 0.05, 0, 2.2, -L / 2 + 0.02);
     seat = V3(0.6, 5.88, -0.4); height = 6.6;
+  } else if (type === 'airboat') {
+    hull(0.5, 0.1, 'paint', { bow: 0.82, sheer: 0.18, sternTaper: 0.02, deckC: '#6a6e74' }); k.box('vc', W * 0.86, 0.06, 0.08, 0, 0.52, L / 2 - 0.6, chrome);
+    for (const s of [1, -1]) { k.box('vc', 0.07, 1.5, 0.07, s * 0.4, 1.2, -0.25, '#a8aeb4', 0.15); k.box('vc', 0.07, 1.5, 0.07, s * 0.4, 1.2, -0.95, '#a8aeb4', -0.15); k.box('paint', 0.05, 1.3, 0.55, s * 0.5, 2.0, -2.25); k.box('vc', 0.06, 1.6, 0.06, s * 1.0, 1.4, -1.75, '#b8bcc2'); }
+    k.box('vc', 0.8, 0.12, 0.65, 0, 1.95, -0.6, '#2a2c30'); k.box('vc', 0.8, 0.6, 0.1, 0, 2.28, -0.92, '#2a2c30'); k.box('vc', 0.7, 0.08, 0.5, 0, 0.98, 0.6, '#2a2c30');
+    k.box('vc', 0.75, 0.6, 0.85, 0, 0.85, -1.3, '#3a3d42'); k.box('vc', 0.5, 0.35, 0.5, 0, 1.3, -1.3, '#c0392b');
+    k.add('vc', CG.tor(0.035, 20), 0, 2.15, -1.78, 2.7, 2.7, 2.7, '#b8bcc2'); for (let i = 0; i < 4; i++) k.box('vc', 0.03, 2.66, 0.03, 0, 2.15, -1.86, '#b8bcc2', 0, 0, i * Math.PI / 4);
+    k.box('head', 0.25, 0.1, 0.05, 0, 0.62, L / 2 - 0.25); k.box('tail', 0.15, 0.08, 0.04, 0, 0.6, -L / 2 + 0.02);
+    seat = V3(0, 2.02, -0.6); height = 3.5; extra.fan = [0, 2.15, -1.62, 1.22];
+  } else if (type === 'sailboat') {
+    hull(1.0, 1.0, white, { bow: 0.55, sheer: 0.35, deckC: teak }); k.box('vc', 0.14, 1.4, 1.5, 0, -1.6, 0.3, dark); k.box('vc', 0.5, 0.3, 1.6, 0, -2.3, 0.1, dark);
+    for (const s of [1, -1]) { k.box('vc', 0.04, 0.12, L * 0.8, s * (W / 2 - 0.02), 1.02, -0.3, '#1d2b4a'); k.box('vc', 0.02, 0.16, 1.8, s * W * 0.25, 1.32, 0.9, '#1d2430'); k.box('vc', 0.015, 11.3, 0.015, s * 0.65, 6.6, 1.6, '#8a8e94', 0, 0, s * 0.116); }
+    k.add('vc', CG.frus(0.8, 0.85), 0, 1.25, 0.9, W * 0.56, 0.55, 3.4, '#f2efe6'); k.box('vc', W * 0.5, 0.06, 2.0, 0, 0.84, -2.6, '#c8b08a'); k.box('vc', 0.05, 0.05, 1.0, 0, 1.15, -3.6, teak);
+    k.cyl('vc', 0.07, 11.5, 0, 6.6, 1.6, '#d0d4d8'); k.box('vc', 0.015, 11.2, 0.015, 0, 6.8, 2.95, '#8a8e94', -0.244);
+    k.raw('sail', polyGeo([V3(0, 12.0, 1.72), V3(0, 1.5, 4.15), V3(0.55, 1.8, 0.9)], V3(-1, 6, 2)));
+    k.box('head', 0.2, 0.08, 0.04, 0, 1.3, L / 2 - 0.3); k.box('tail', 0.15, 0.08, 0.04, 0, 1.2, -L / 2 + 0.02);
+    const k2 = new Kit(); k2.box('vc', 0.09, 0.12, 4.0, 0, 1.95, -2.0, '#d0d4d8'); k2.raw('sail', polyGeo([V3(0, 12.1, 0), V3(0, 2.05, 0), V3(0, 2.05, -3.9)], V3(-1, 5, -1)));
+    extra.boom = { p: [0, 0, 1.6], geos: k2.geos() }; seat = V3(0.5, 1.05, -2.9); height = 12.5;
+  } else if (type === 'policeboat') {
+    hull(0.95, 0.55, 'paint', { bow: 0.55, sheer: 0.35, deckC: '#5a5e64' });
+    for (const s of [1, -1]) { k.box('vc', 0.05, 0.16, L * 0.66, s * (W / 2 - 0.01), 0.72, -0.4, '#f4f4f4'); k.box('vc', 0.05, 0.08, L * 0.66, s * (W / 2 - 0.01), 0.58, -0.4, '#ffcc00'); k.cyl('vc', 0.24, L * 0.7, s * (W / 2 - 0.06), 1.02, -0.5, '#2a2c30', 'z', 8);
+      for (const z of [0.1, -1.1]) k.cyl('chrome', 0.035, 1.5, s * 0.6, 2.2, z); k.box('vc', 0.4, 0.9, 0.45, s * 0.45, 1.25, -L / 2 - 0.2, '#1d1e22'); k.box('vc', 0.12, 0.8, 0.2, s * 0.45, 0.42, -L / 2 - 0.25, '#2a2c30'); }
+    k.box('vc', 1.1, 1.0, 1.0, 0, 1.45, 0.45, '#e8e8e4'); k.raw('glass', polyGeo([V3(-0.55, 1.95, 0.95), V3(0.55, 1.95, 0.95), V3(0.5, 2.45, 0.7), V3(-0.5, 2.45, 0.7)], V3(0, 1.8, 0)));
+    k.box('vc', 1.6, 0.08, 1.8, 0, 2.95, -0.5, '#e8e8e4'); k.box('vc', 1.0, 0.5, 0.6, 0, 1.2, -0.95, '#2a2c30'); k.box('vc', 1.62, 0.2, 0.06, 0, 2.95, 0.42, '#1d2b4a');
+    k.box('head', 0.22, 0.1, 0.05, 0, 1.0, L / 2 - 0.2); k.box('tail', 0.15, 0.08, 0.05, 0, 1.0, -L / 2 + 0.02);
+    seat = V3(0, 1.42, -0.55); height = 3.1; extra.bar = [[0.35, 3.06, -0.5], [-0.35, 3.06, -0.5]];
+  } else if (type === 'tug') {
+    hull(1.6, 1.5, 'paint', { bow: 0.5, sheer: 0.45, sternTaper: 0.04, deckC: '#5a5e64' });
+    for (const s of [1, -1]) for (let i = 0; i < 4; i++) k.add('vc', CG.tor(0.38, 10), s * (W / 2 + 0.05), 1.1, -4 + i * 1.8, 0.75, 0.75, 0.75, '#1b1b1d', 0, Math.PI / 2, 0);
+    k.cyl('vc', 0.55, 1.6, 0, 1.45, L / 2 - 0.25, '#1b1b1d', 'x', 10); k.cyl('vc', 0.45, W * 0.8, 0, 1.25, -L / 2 + 0.1, '#1b1b1d', 'x', 10);
+    k.box('vc', W * 0.6, 1.9, 4.4, 0, 2.55, 0.6, '#f0ece2'); k.box('vc', W * 0.56, 1.5, 2.3, 0, 4.25, 1.4, '#f0ece2'); k.box('glass', W * 0.57, 0.6, 2.32, 0, 4.45, 1.4); k.box('vc', W * 0.66, 0.12, 2.6, 0, 5.05, 1.4, '#1d1e22');
+    k.cyl('vc', 0.07, 2.2, 0, 6.1, 1.0, '#2a2c30'); k.box('vc', 1.2, 0.06, 0.1, 0, 6.6, 1.0, '#2a2c30'); k.cyl('vc', 0.42, 2.2, 0, 4.4, -0.9, '#1d1e22', 'y', 10); k.cyl('paint', 0.44, 0.5, 0, 4.9, -0.9, null, 'y', 10);
+    k.cyl('vc', 0.25, 0.7, 0, 1.95, -3.7, '#2a2c30'); k.cyl('vc', 0.4, 1.4, 0, 2.05, -2.5, '#3a5a3a', 'x', 10); for (const s of [1, -1]) k.box('vc', 0.05, 0.5, 6.5, s * (W / 2 - 0.15), 1.85, -1.6, '#e8e8e4');
+    k.box('head', 0.25, 0.12, 0.05, 0, 2.2, L / 2 - 0.4); k.box('tail', 0.2, 0.12, 0.05, 0, 2.0, -L / 2 + 0.02);
+    seat = V3(0.4, 3.55, 1.8); height = 6.8;
+  } else if (type === 'catamaran') {
+    for (const s of [1, -1]) { const h = hullGeos(L, 1.5, 1.05, 0.75, { bow: 0.62, sheer: 0.3 }); k.raw('vc', geoT(h.hull, s * 2.45, 0, 0), white); k.raw('vc', geoT(h.deck, s * 2.45, 0, 0), '#e8e2d4'); k.raw('vc', geoT(h.transom, s * 2.45, 0, 0), white);
+      k.box('paint', 0.04, 0.14, L * 0.6, s * 3.21, 0.85, -0.6); k.box('vc', 1.0, 0.2, 0.8, s * 2.45, 0.6, -L / 2 - 0.2, teak); }
+    k.box('vc', 5.6, 0.3, 8.0, 0, 1.35, -1.2, white); k.box('vc', 3.4, 0.04, 2.6, 0, 1.25, 4.1, '#2a2c30'); k.box('vc', 5.0, 0.15, 0.2, 0, 1.3, 5.4, '#d0d4d8');
+    k.add('vc', CG.frus(0.9, 0.82), 0, 2.45, -0.8, 5.0, 1.9, 5.2, '#f8f8f4'); k.box('glass', 4.8, 0.55, 4.75, 0, 2.55, -0.8);
+    k.box('vc', 3.2, 0.1, 2.8, 0, 3.42, -1.4, '#e8e8e4'); k.box('vc', 0.8, 0.6, 0.4, 0.8, 3.75, -0.4, '#e8e8e4'); k.box('vc', 3.0, 0.06, 2.4, 0, 5.0, -1.6, '#1d2b4a');
+    for (const sx of [-1.4, 1.4]) for (const sz of [-0.5, -2.7]) k.cyl('chrome', 0.03, 1.5, sx, 4.2, sz);
+    k.box('head', 0.2, 0.1, 0.05, 2.45, 1.0, L / 2 - 0.3); k.box('tail', 0.15, 0.1, 0.05, 0, 1.4, -L / 2 + 0.02);
+    seat = V3(0.8, 3.55, -1.0); height = 5.1;
+  } else if (type === 'dinghy') {
+    hull(0.4, 0.22, '#3a3d42', { bow: 0.6, sheer: 0.15, deckC: '#5a5e64' }); const tw = W / 2 - 0.12;
+    for (const s of [1, -1]) { k.cyl('paint', 0.27, L * 0.68, s * tw, 0.58, -0.45, null, 'z', 10); k.sph('paint', 0.27, s * tw, 0.58, -0.45 - L * 0.34); }
+    for (let i = 0; i <= 8; i++) { const a = i / 8 * Math.PI; k.sph('paint', 0.28, Math.cos(a) * tw, 0.6, -0.45 + L * 0.34 + Math.sin(a) * 0.9); }
+    k.box('vc', 0.35, 0.55, 0.4, 0, 0.85, -L / 2 - 0.12, '#1d1e22'); k.box('vc', 0.1, 0.6, 0.15, 0, 0.3, -L / 2 - 0.15, '#2a2c30'); k.box('vc', 0.05, 0.05, 0.6, 0.15, 0.95, -L / 2 + 0.25, dark); k.box('vc', 0.5, 0.35, 0.5, 0, 0.6, -1.2, '#2a2c30');
+    k.box('head', 0.12, 0.06, 0.04, 0, 0.75, L / 2 - 0.1); k.box('tail', 0.1, 0.06, 0.04, 0, 0.9, -L / 2 - 0.3);
+    seat = V3(0.15, 0.72, -1.25); height = 1.3;
   } else { // Fischerboot
     hull(1.6, 1.0, 'paint', { bow: 0.58, sheer: 0.55, deckC: '#8a7a64' }); for (const s of [1, -1]) k.box('vc', 0.04, 0.25, L * 0.85, s * (W / 2 - 0.01), 1.45, 0.1, white);
     k.add('vc', CG.frus(0.92, 0.9), 0, 2.7, 1.3, W * 0.66, 2.2, 3.0, white); k.box('vc', W * 0.74, 0.18, 3.3, 0, 3.85, 1.3, '#2a6f97');
@@ -573,13 +623,18 @@ function boatGeos(type) {
     k.box('head', 0.2, 0.1, 0.05, 0, 2.2, L / 2 - 0.5); k.box('tail', 0.15, 0.1, 0.05, 0, 2.0, -L / 2 + 0.02);
     seat = V3(0, 1.55, 1.2); height = 3.4;
   }
-  _boatCache[type] = { geos: k.geos(), seat, pose, height }; return _boatCache[type];
+  _boatCache[type] = { geos: k.geos(), seat, pose, height, extra }; return _boatCache[type];
 }
+const SAILMAT = lam({ color: 0xf6f4ee, emissive: 0x5a5852, side: THREE.DoubleSide, flatShading: true });
 function buildBoat(type, color) {
   const S = CFG.VEHICLES[type], B2 = boatGeos(type), grp = new THREE.Group(), body = new THREE.Group(); grp.add(body);
-  const add = (g, m, cast = true) => { if (!g) return; const mm = new THREE.Mesh(g, m); mm.castShadow = cast; body.add(mm); return mm; };
-  const G2 = B2.geos; add(G2.paint, paintMat(color)); add(G2.vc, MAT.vehVC); add(G2.chrome, MAT.chrome); add(G2.glass, MAT.glassDark, false); add(G2.head, MAT.headlight, false); const tailMat = tailMatNew(); add(G2.tail, tailMat, false);
-  return { group: grp, body, paint: null, wheels: [], tailMat, seat: B2.seat.clone(), len: S.len, wid: S.wid, height: B2.height, pose: B2.pose };
+  const add = (g, m, cast = true, par = body) => { if (!g) return; const mm = new THREE.Mesh(g, m); mm.castShadow = cast; par.add(mm); return mm; };
+  const G2 = B2.geos; add(G2.paint, paintMat(color)); add(G2.vc, MAT.vehVC); add(G2.chrome, MAT.chrome); add(G2.glass, MAT.glassDark, false); add(G2.sail, SAILMAT); add(G2.head, MAT.headlight, false); const tailMat = tailMatNew(); add(G2.tail, tailMat, false);
+  const res = { group: grp, body, paint: null, wheels: [], tailMat, seat: B2.seat.clone(), len: S.len, wid: S.wid, height: B2.height, pose: B2.pose, fan: null, sail: null, bar: null }, X = B2.extra || {};
+  if (X.fan) { const [x, y, z, R] = X.fan, f = new THREE.Group(); f.position.set(x, y, z); f.add(new THREE.Mesh(mergeGeos([geoT(CG.box(), 0, 0, 0, 0, 0, 0, R * 2, 0.22, 0.05), geoT(CG.box(), 0, 0, 0, 0, 0, Math.PI / 2, R * 2, 0.22, 0.05), geoT(CG.cyl(8), 0, 0, 0.05, Math.PI / 2, 0, 0, 0.3, 0.2, 0.3)]), MAT.trim)); body.add(f); res.fan = f; }
+  if (X.boom) { const g = new THREE.Group(); g.position.set(...X.boom.p); add(X.boom.geos.vc, MAT.vehVC, true, g); add(X.boom.geos.sail, SAILMAT, true, g); body.add(g); res.sail = g; }
+  if (X.bar) { res.bar = [new THREE.MeshStandardMaterial({ color: 0x400000, emissive: 0xff1010, emissiveIntensity: 0.2 }), new THREE.MeshStandardMaterial({ color: 0x000040, emissive: 0x1050ff, emissiveIntensity: 0.2 })]; X.bar.forEach(([x, y, z], i) => { const m = new THREE.Mesh(CG.box(), res.bar[i]); m.scale.set(0.5, 0.14, 0.22); m.position.set(x, y, z); body.add(m); }); }
+  return res;
 }
 
 // ---------- LUFTFAHRZEUGE ----------
@@ -589,6 +644,11 @@ const _airCache = {};
 function airGeos(type) {
   if (_airCache[type]) return _airCache[type]; const k = new Kit(), dark = '#1d1e22', grey = '#5a5f66', chrome = '#c8ccd2';
   const fus = (secs, key = 'paint') => k.raw(key, loftGeo(secs.map(([z, rx, ry, cy, n = 10]) => ({ z, pts: ring(n, Math.max(rx, 0.005), Math.max(ry, 0.005), 0, cy, Math.PI / n) }))));
+  const secAt = (F, z) => { for (let i = 0; i < F.length - 1; i++) { const A = F[i], B = F[i + 1]; if (z >= A[0] && z <= B[0]) { const t = (z - A[0]) / (B[0] - A[0]); return [z, lerp(A[1], B[1], t), lerp(A[2], B[2], t), lerp(A[3], B[3], t)]; } } const E = z < F[0][0] ? F[0] : F[F.length - 1]; return [z, E[1], E[2], E[3]]; };
+  // Fläche auf dem Rumpf (Fenster, Zierstreifen): Bogen a0..a1 zwischen z0 und z1, knapp außerhalb der Hülle
+  const shell = (F, z0, z1, a0, a1, key, c, nz = 4, na = 4, sc = 1.025) => { const secs = []; let mr = [1, 1];
+    for (let i = 0; i <= nz; i++) { const [z, rx, ry, cy] = secAt(F, lerp(z0, z1, i / nz)), p = []; for (let j = 0; j <= na; j++) { const a = lerp(a0, a1, j / na); p.push([Math.cos(a) * rx * sc, cy + Math.sin(a) * ry * sc]); } secs.push({ z, pts: p }); if (i === nz >> 1) mr = [rx, ry]; }
+    const am = (a0 + a1) / 2; k.raw(key, loftGeo(secs, { closed: false, caps: false, inside: [-Math.cos(am) * mr[0] * 0.8, -Math.sin(am) * mr[1] * 0.8] }), c); };
   if (type === 'jet') {
     fus([[-7.9, 0.5, 0.45, 1.75], [-6.8, 0.82, 0.62, 1.75], [-3, 1.02, 0.78, 1.72], [1, 1.0, 0.78, 1.72], [3.4, 0.86, 0.72, 1.78], [5.6, 0.55, 0.52, 1.75], [7.0, 0.28, 0.3, 1.72], [8.0, 0.03, 0.04, 1.7]]);
     const wing = wingGeo([[0.8, -4.6], [5.4, -3.6], [5.4, -2.7], [0.8, 1.6]], 0.14); k.raw('paint', geoT(wing, 0, 1.45, 0)); k.raw('paint', mirrorX(geoT(wing, 0, 1.45, 0)));
@@ -612,6 +672,102 @@ function airGeos(type) {
     k.cyl('vc', 0.035, 1.0, 0, 1.0, 3.2, dark); k.cyl('vc', 0.2, 0.35, 0, 1.55, 4.2, '#e8e8e4', 'z', 10); k.add('vc', CG.cone(10), 0, 1.55, 4.5, 0.4, 0.35, 0.4, '#e8e8e4', Math.PI / 2, 0, 0);
     for (const [x, y, z] of [[1.3, 0.3, 1.2], [-1.3, 0.3, 1.2], [0, 0.28, 3.2]]) k.cyl('vc', 0.3, 0.16, x, y, z, '#1b1b1d', 'x', 12);
     _airCache[type] = { geos: k.geos(), seat: V3(0, 1.32, 1.1), len: 8.6, wid: 11, height: 3, gearH: 1.25 };
+  } else if (type === 'biplane') {
+    fus([[-3.6, 0.08, 0.1, 1.62, 8], [-2.4, 0.3, 0.36, 1.53, 8], [-0.7, 0.5, 0.58, 1.46, 8], [1.0, 0.56, 0.62, 1.46, 8], [2.3, 0.56, 0.6, 1.46, 8], [2.7, 0.55, 0.56, 1.46, 8]]);
+    k.cyl('vc', 0.64, 0.5, 0, 1.46, 2.95, '#2a2c30', 'z', 14); for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; k.box('vc', 0.2, 0.22, 0.3, Math.cos(a) * 0.5, 1.46 + Math.sin(a) * 0.5, 3.12, '#8a8e94', 0, 0, a); }
+    k.add('vc', CG.cone(10), 0, 1.46, 3.5, 0.34, 0.36, 0.34, '#e8e8e4', Math.PI / 2, 0, 0);
+    k.box('paint', 8.4, 0.12, 1.25, 0, 0.98, 0.85); k.box('paint', 9.2, 0.12, 1.3, 0, 2.62, 1.25);
+    for (const s of [1, -1]) { k.box('vc', 0.55, 0.13, 1.27, s * 3.95, 0.98, 0.85, '#f4f4f0'); k.box('vc', 0.55, 0.13, 1.32, s * 4.35, 2.62, 1.25, '#f4f4f0');
+      for (const z of [0.45, 1.25]) k.box('vc', 0.07, 1.68, 0.09, s * 3.25, 1.8, z + 0.2, '#d8cfb0', 0.24);
+      for (const z of [0.85, 1.55]) k.box('vc', 0.05, 0.66, 0.05, s * 0.36, 2.3, z, dark, 0, 0, -s * 0.3);
+      k.box('vc', 0.018, 3.16, 0.018, s * 1.85, 1.8, 1.05, '#3a3c40', 0, 0, -s * 1.02);
+      k.box('vc', 0.06, 0.84, 0.06, s * 0.59, 0.66, 1.3, dark, 0, 0, s * 0.78); k.cyl('vc', 0.36, 0.14, s * 0.88, 0.36, 1.3, '#1b1b1d', 'x', 12); k.cyl('vc', 0.13, 0.16, s * 0.88, 0.36, 1.3, chrome, 'x', 8); }
+    k.box('vc', 0.62, 0.05, 0.9, 0, 2.04, -0.45, '#1d1e22'); k.raw('glass', polyGeo([V3(-0.32, 2.03, 0.1), V3(0.32, 2.03, 0.1), V3(0.26, 2.36, -0.02), V3(-0.26, 2.36, -0.02)], V3(0, 1.9, -0.6)));
+    k.box('paint', 2.9, 0.07, 0.75, 0, 1.64, -3.2); k.raw('paint', geoT(wingGeo([[0, -3.75], [1.25, -3.55], [1.25, -3.05], [0, -2.55]], 0.07), 0.035, 1.66, 0, 0, 0, Math.PI / 2));
+    k.box('vc', 0.05, 1.25, 0.05, 0, 0.82, -3.15, dark); k.cyl('vc', 0.15, 0.08, 0, 0.15, -3.2, '#1b1b1d', 'x', 8);
+    _airCache[type] = { custom: true, geos: k.geos(), seat: V3(0, 1.28, -0.45), len: 7.4, wid: 9.2, height: 3, gearH: 1.3, props: [[0, 1.46, 3.32, 1.1, 2]], nav: [[0xff2020, 4.62, 2.62, 1.25], [0x20ff40, -4.62, 2.62, 1.25]] };
+  } else if (type === 'seaplane') {
+    const o = 0.95;
+    fus([[-4.5, 0.12, 0.12, 1.85 + o, 8], [-3.2, 0.32, 0.38, 1.75 + o, 8], [-1, 0.62, 0.72, 1.62 + o, 8], [0.4, 0.68, 0.8, 1.62 + o, 8], [2.2, 0.66, 0.74, 1.58 + o, 8], [3.4, 0.5, 0.55, 1.55 + o, 8], [4.1, 0.3, 0.32, 1.55 + o, 8]]);
+    k.box('paint', 11.6, 0.14, 1.6, 0, 2.42 + o, 0.9); for (const s of [1, -1]) { k.box('vc', 0.06, 0.16, 1.62, s * 5.8, 2.42 + o, 0.9, '#c0392b'); k.cyl('vc', 0.04, 1.6, s * 1.05, 1.62 + o, 0.85, dark, 'y', 6, 0, 0, s * 0.85); }
+    k.box('paint', 3.6, 0.08, 0.9, 0, 1.82 + o, -4.0); k.raw('paint', geoT(wingGeo([[0, -4.6], [1.6, -4.2], [1.6, -3.5], [0, -2.9]], 0.08), 0.04, 1.85 + o, 0, 0, 0, Math.PI / 2));
+    for (const s of [1, -1]) k.raw('glass', polyGeo([V3(s * 0.66, 1.75 + o, 0.0), V3(s * 0.66, 1.75 + o, 1.6), V3(s * 0.58, 2.25 + o, 1.5), V3(s * 0.58, 2.25 + o, 0.1)], V3(0, 1.9 + o, 0.8)));
+    k.raw('glass', polyGeo([V3(-0.55, 2.0 + o, 2.15), V3(0.55, 2.0 + o, 2.15), V3(0.45, 2.38 + o, 1.45), V3(-0.45, 2.38 + o, 1.45)], V3(0, 1.8 + o, 1.5)));
+    k.cyl('vc', 0.2, 0.35, 0, 1.55 + o, 4.2, '#e8e8e4', 'z', 10); k.add('vc', CG.cone(10), 0, 1.55 + o, 4.6, 0.4, 0.35, 0.4, '#e8e8e4', Math.PI / 2, 0, 0);
+    for (const s of [1, -1]) { k.raw('vc', loftGeo([[-3.0, 0.05, 0.05, 0.5], [-2.2, 0.24, 0.2, 0.42], [-0.5, 0.34, 0.32, 0.38], [1.8, 0.34, 0.32, 0.38], [3.2, 0.26, 0.24, 0.48], [3.9, 0.05, 0.08, 0.6]].map(([z, rx, ry, cy]) => ({ z, pts: ring(8, rx, ry, s * 1.35, cy, Math.PI / 8) }))), '#eeeeea');
+      k.box('vc', 0.06, 0.07, 5.6, s * 1.35, 0.7, 0.4, '#c0392b');
+      for (const z of [1.5, -0.6]) k.cyl('vc', 0.05, 1.45, s * 0.93, 1.28, z, dark, 'y', 6, 0, 0, s * 0.64); }
+    for (const z of [1.5, -0.6]) k.box('vc', 2.6, 0.07, 0.1, 0, 0.92, z, dark);
+    _airCache[type] = { custom: true, geos: k.geos(), seat: V3(0, 1.32 + o, 1.1), len: 9.2, wid: 11.6, height: 4, gearH: 2.2, props: [[0, 1.55 + o, 4.42, 1.0, 2]], nav: [[0xff2020, 5.84, 2.42 + o, 0.9], [0x20ff40, -5.84, 2.42 + o, 0.9]] };
+  } else if (type === 'cargo') {
+    const F = [[-10, 0.3, 0.45, 3.7, 10], [-8.2, 0.95, 1.05, 3.15, 10], [-5.2, 1.6, 1.7, 2.45, 10], [3, 1.65, 1.75, 2.35, 10], [6.4, 1.45, 1.55, 2.35, 10], [8.5, 0.95, 1.05, 2.25, 10], [9.8, 0.3, 0.38, 2.1, 10]]; fus(F);
+    shell(F, 7.6, 8.7, 0.5, 2.64, 'glass'); shell(F, 6.5, 7.5, 0.12, 0.6, 'glass', null, 2, 2); shell(F, 6.5, 7.5, Math.PI - 0.6, Math.PI - 0.12, 'glass', null, 2, 2);
+    for (const a of [-0.2, Math.PI + 0.2]) shell(F, -7.5, 7.0, a - 0.05, a + 0.05, 'vc', '#1d2b4a', 10, 1);
+    const wing = wingGeo([[0.6, -1.2], [12, -0.5], [12, 1.0], [0.6, 2.0]], 0.3); k.raw('paint', geoT(wing, 0, 4.12, 0)); k.raw('paint', mirrorX(geoT(wing, 0, 4.12, 0))); k.box('paint', 1.8, 0.45, 3.2, 0, 4.0, 0.4);
+    for (const s of [1, -1]) { const x = s * 4.3; k.cyl('paint', 0.62, 4.6, x, 3.75, 0.9, null, 'z', 10); k.add('vc', CG.cone(10), x, 3.75, 3.55, 0.6, 0.6, 0.6, '#2a2c30', Math.PI / 2, 0, 0); k.cyl('vc', 0.3, 0.5, x, 3.25, 2.9, '#2a2c30', 'z', 8);
+      k.box('paint', 0.9, 1.1, 3.6, s * 1.75, 0.95, -0.6); k.cyl('vc', 0.55, 0.42, s * 1.75, 0.55, 0.3, '#1b1b1d', 'x', 12); k.cyl('vc', 0.55, 0.42, s * 1.75, 0.55, -1.5, '#1b1b1d', 'x', 12); }
+    k.cyl('vc', 0.4, 0.3, 0, 0.4, 7.4, '#1b1b1d', 'x', 10); k.box('vc', 0.12, 0.7, 0.12, 0, 0.8, 7.4, dark);
+    k.raw('paint', geoT(wingGeo([[0, -10.2], [3.6, -9.6], [3.6, -8.3], [0, -6.4]], 0.18), 0.09, 3.9, 0, 0, 0, Math.PI / 2));
+    const hs = wingGeo([[0, -10.4], [4.3, -10.0], [4.3, -9.2], [0, -8.5]], 0.14); k.raw('paint', geoT(hs, 0, 7.45, 0)); k.raw('paint', mirrorX(geoT(hs, 0, 7.45, 0)));
+    _airCache[type] = { custom: true, geos: k.geos(), seat: V3(0.55, 2.45, 7.3), len: 20, wid: 24, height: 8, gearH: 2.0, props: [[4.3, 3.75, 3.38, 1.7, 4], [-4.3, 3.75, 3.38, 1.7, 4]], nav: [[0xff2020, 12, 4.12, 0.2], [0x20ff40, -12, 4.12, 0.2], [0xffffff, 0, 7.6, -10.3]] };
+  } else if (type === 'bizjet') {
+    const F = [[-8.5, 0.12, 0.3, 2.7, 10], [-7, 0.55, 0.65, 2.3, 10], [-4, 0.95, 1.0, 2.0, 10], [2.5, 1.0, 1.05, 1.95, 10], [5.5, 0.85, 0.88, 1.85, 10], [7.2, 0.5, 0.5, 1.72, 10], [8.5, 0.05, 0.06, 1.6, 10]]; fus(F);
+    shell(F, 5.6, 6.6, 0.55, 2.59, 'glass'); for (let z = -3.4; z <= 3.0; z += 0.85) for (const a of [0.28, Math.PI - 0.28]) shell(F, z, z + 0.42, a - 0.13, a + 0.13, 'glass', null, 1, 1);
+    for (const a of [-0.3, Math.PI + 0.3]) shell(F, -7.5, 7.0, a - 0.04, a + 0.04, 'vc', '#c9a43a', 10, 1);
+    const wing = wingGeo([[0.7, -2.4], [7.4, -4.6], [7.4, -3.7], [0.7, 0.9]], 0.16); k.raw('paint', geoT(wing, 0, 1.25, 0)); k.raw('paint', mirrorX(geoT(wing, 0, 1.25, 0)));
+    const wl = wingGeo([[0, -4.75], [1.0, -4.95], [1.0, -4.55], [0, -3.75]], 0.06); k.raw('paint', geoT(wl, 7.4, 1.3, 0, 0, 0, Math.PI / 2 - 0.2)); k.raw('paint', mirrorX(geoT(wl, 7.4, 1.3, 0, 0, 0, Math.PI / 2 - 0.2)));
+    for (const s of [1, -1]) { k.cyl('vc', 0.46, 2.6, s * 1.6, 2.55, -5.3, '#e4e4e0', 'z', 10); k.cyl('vc', 0.37, 0.06, s * 1.6, 2.55, -3.99, '#2a2c30', 'z', 10); k.cyl('vc', 0.32, 0.1, s * 1.6, 2.55, -6.62, '#3a1a10', 'z', 10); k.box('paint', 0.9, 0.18, 1.2, s * 1.05, 2.5, -5.3); }
+    k.raw('vc', geoT(wingGeo([[0, -8.7], [3.0, -9.0], [3.0, -8.0], [0, -5.6]], 0.12), 0.06, 2.75, 0, 0, 0, Math.PI / 2), '#141a2e');
+    const hs = wingGeo([[0, -9.15], [3.0, -9.4], [3.0, -8.75], [0, -8.0]], 0.08); k.raw('vc', geoT(hs, 0, 5.72, 0), '#141a2e'); k.raw('vc', mirrorX(geoT(hs, 0, 5.72, 0)), '#141a2e');
+    _airCache[type] = { custom: true, geos: k.geos(), seat: V3(0.42, 1.75, 5.6), len: 17, wid: 15.5, height: 5.8, gearH: 1.6, gearPts: [[0, 6.2, 0.32, 1.25], [1.45, -0.4, 0.42, 1.2], [-1.45, -0.4, 0.42, 1.2]], nav: [[0xff2020, 7.5, 1.3, -3.9], [0x20ff40, -7.5, 1.3, -3.9], [0xffffff, 0, 5.8, -8.9]] };
+  } else if (type === 'airliner') {
+    const F = [[-19, 0.3, 0.7, 5.6, 12], [-16, 1.5, 1.8, 4.5, 12], [-11, 2.05, 2.15, 4.0, 12], [10, 2.05, 2.15, 4.0, 12], [14.5, 1.85, 1.9, 3.85, 12], [17.4, 1.1, 1.05, 3.55, 12], [19, 0.12, 0.15, 3.3, 12]]; fus(F);
+    shell(F, 16.0, 17.2, 0.6, 2.54, 'vc', '#1d2430', 3, 4);
+    for (const a of [0.3, Math.PI - 0.3]) shell(F, -13, 13, a - 0.045, a + 0.045, 'vc', '#1d2430', 12, 1);
+    for (const a of [-0.42, Math.PI + 0.42]) shell(F, -18.5, 18.6, a - 0.07, a + 0.07, 'vc', '#1d4e89', 12, 1);
+    const wing = wingGeo([[1.5, -3.2], [17.5, -10.8], [17.5, -9.2], [1.5, 4.0]], 0.34); k.raw('paint', geoT(wing, 0, 2.55, 0)); k.raw('paint', mirrorX(geoT(wing, 0, 2.55, 0)));
+    for (const s of [1, -1]) { const x = s * 6.2; k.cyl('vc', 1.05, 4.4, x, 1.3, 1.3, '#dcdcdc', 'z', 12); k.cyl('vc', 0.86, 0.06, x, 1.3, 3.52, '#2a2c30', 'z', 12); k.cyl('vc', 0.6, 0.2, x, 1.3, -0.95, '#3a3a3a', 'z', 10); k.box('vc', 0.3, 0.6, 3.0, x, 2.3, 0.6, '#dcdcdc'); }
+    k.raw('vc', geoT(wingGeo([[0, -19.6], [6.6, -20.0], [6.6, -17.6], [0, -13.4]], 0.3), 0.15, 5.4, 0, 0, 0, Math.PI / 2), '#1d4e89');
+    const hs = wingGeo([[0.5, -19.2], [6.8, -20.2], [6.8, -19.0], [0.5, -15.8]], 0.2); k.raw('paint', geoT(hs, 0, 5.0, 0)); k.raw('paint', mirrorX(geoT(hs, 0, 5.0, 0)));
+    _airCache[type] = { custom: true, geos: k.geos(), seat: V3(0.6, 3.75, 16.2), len: 38, wid: 35, height: 12, gearH: 2.5, gearPts: [[0, 15.2, 0.45, 2.0], [3.0, -1.6, 0.62, 2.35], [-3.0, -1.6, 0.62, 2.35]], nav: [[0xff2020, 17.6, 2.55, -9.9], [0x20ff40, -17.6, 2.55, -9.9], [0xffffff, 0, 6.3, -19.2]] };
+  } else if (type === 'newsheli' || type === 'polmav') {
+    const F = [[-1.5, 0.42, 0.5, 1.75, 10], [-0.6, 0.82, 0.92, 1.8, 10], [0.6, 0.88, 0.98, 1.78, 10], [1.6, 0.74, 0.82, 1.68, 10], [2.3, 0.42, 0.48, 1.52, 10], [2.6, 0.06, 0.08, 1.45, 10]]; fus(F);
+    fus([[-6.4, 0.1, 0.14, 2.15, 6], [-1.3, 0.26, 0.34, 1.95, 6]]);
+    shell(F, 0.9, 2.5, -0.55, Math.PI + 0.55, 'glass', null, 4, 7); shell(F, -0.6, 0.75, 0.05, 0.8, 'glass', null, 2, 2); shell(F, -0.6, 0.75, Math.PI - 0.8, Math.PI - 0.05, 'glass', null, 2, 2);
+    for (const a of [-0.38, Math.PI + 0.38]) shell(F, -1.45, 0.85, a - 0.08, a + 0.08, 'vc', type === 'polmav' ? '#ffcc00' : '#f4f4f4', 3, 1);
+    k.add('vc', CG.frus(0.8, 0.8), 0, 2.8, -0.4, 1.0, 0.5, 1.9, '#5a5f66'); k.cyl('vc', 0.1, 0.4, 0, 3.15, 0.15, dark); k.cyl('vc', 0.16, 0.5, 0, 2.6, -1.5, dark, 'z', 8);
+    k.raw('paint', geoT(wingGeo([[0, -6.7], [1.2, -6.55], [1.2, -6.05], [0, -5.7]], 0.07), 0.035, 2.2, 0, 0, 0, Math.PI / 2)); k.box('paint', 1.6, 0.06, 0.45, 0, 2.15, -5.4);
+    for (const s of [1, -1]) { k.cyl('vc', 0.055, 3.4, s * 0.9, 0.1, 0.35, '#3a3c40', 'z', 6); k.cyl('vc', 0.055, 0.5, s * 0.9, 0.24, 2.2, '#3a3c40', 'y', 6, 0.9); for (const z of [1.1, -0.6]) k.cyl('vc', 0.045, 0.95, s * 0.8, 0.52, z, '#3a3c40', 'y', 6, 0, 0, s * 0.3); }
+    if (type === 'polmav') { k.cyl('vc', 0.17, 0.4, -0.85, 0.78, 1.75, '#d8d8d4', 'z', 8); k.cyl('vc', 0.13, 0.03, -0.85, 0.78, 1.96, '#fff6d0', 'z', 8); }
+    else { k.sph('vc', 0.24, 0, 0.74, 2.0, '#2a2c30'); k.cyl('vc', 0.09, 0.1, 0, 0.74, 2.24, '#4a7aa0', 'z', 8); }
+    _airCache[type] = { custom: true, geos: k.geos(), seat: V3(0.38, 1.12, 0.85), len: 11, wid: 2, height: 3.4, gearH: 0, rotors: [[0, 3.32, 0.15, 5.3, 4, 0.28]], tail: [0.2, 2.35, -6.3, 0.7], nav: [[0xff2020, 0, 2.38, -6.5], [0x20ff40, 0, 0.95, 2.5]], bar: type === 'polmav' ? [[0.24, 3.08, -0.9], [-0.24, 3.08, -0.9]] : null, beam: type === 'polmav' ? [-0.85, 0.78, 1.95] : null };
+  } else if (type === 'cargoheli') {
+    const F = [[-7.6, 0.85, 1.0, 2.45, 8], [-6.6, 1.2, 1.35, 2.15, 8], [5.0, 1.2, 1.35, 2.1, 8], [6.3, 1.05, 1.2, 2.05, 8], [7.3, 0.55, 0.75, 1.95, 8]]; fus(F);
+    shell(F, 6.2, 7.2, 0.25, 2.89, 'glass', null, 2, 5); shell(F, 5.3, 6.3, 0.05, 0.7, 'glass', null, 2, 2); shell(F, 5.3, 6.3, Math.PI - 0.7, Math.PI - 0.05, 'glass', null, 2, 2);
+    for (let z = -4.5; z <= 3.5; z += 1.6) for (const a of [0.18, Math.PI - 0.18]) shell(F, z, z + 0.55, a - 0.1, a + 0.1, 'glass', null, 1, 1);
+    k.box('paint', 1.5, 2.2, 3.2, 0, 4.1, -6.1); k.add('paint', CG.frus(0.7, 0.8), 0, 3.85, 5.6, 1.3, 0.8, 2.2); k.cyl('vc', 0.16, 0.5, 0, 4.3, 5.6, dark); k.cyl('vc', 0.16, 0.4, 0, 5.3, -6.1, dark);
+    for (const s of [1, -1]) { k.box('paint', 0.55, 0.9, 7.5, s * 1.4, 1.25, -1.2); k.cyl('vc', 0.45, 0.35, s * 1.25, 0.45, 4.6, '#1b1b1d', 'x', 10); k.box('vc', 0.12, 0.7, 0.12, s * 1.2, 0.95, 4.6, dark); k.cyl('vc', 0.48, 0.38, s * 1.45, 0.48, -3.6, '#1b1b1d', 'x', 10);
+      k.cyl('vc', 0.35, 1.6, s * 0.9, 3.75, -4.6, '#3a3d34', 'z', 8); }
+    _airCache[type] = { custom: true, geos: k.geos(), seat: V3(0.55, 1.85, 5.8), len: 18, wid: 3.2, height: 5.6, gearH: 0, rotors: [[0, 4.5, 5.6, 8.2, 3, 0.55], [0, 5.5, -6.1, 8.2, 3, 0.55]], nav: [[0xff2020, 1.7, 1.6, 0], [0x20ff40, -1.7, 1.6, 0]] };
+  } else if (type === 'attackheli') {
+    const F = [[-1.9, 0.35, 0.62, 1.85, 8], [-0.6, 0.6, 0.92, 1.95, 8], [1.6, 0.6, 0.9, 1.9, 8], [3.2, 0.48, 0.7, 1.78, 8], [4.4, 0.24, 0.36, 1.58, 8], [4.9, 0.04, 0.06, 1.5, 8]]; fus(F);
+    fus([[-7.8, 0.12, 0.28, 2.3, 6], [-1.7, 0.36, 0.55, 2.05, 6]]);
+    shell(F, 0.4, 1.9, -0.1, Math.PI + 0.1, 'glass', null, 2, 6, 1.07); shell(F, 2.1, 3.7, -0.1, Math.PI + 0.1, 'glass', null, 2, 6, 1.07);
+    for (const s of [1, -1]) { k.cyl('paint', 0.36, 2.2, s * 0.72, 2.7, -0.7, null, 'z', 8); k.cyl('vc', 0.28, 0.05, s * 0.72, 2.7, 0.42, '#2a2c30', 'z', 8);
+      k.box('paint', 1.5, 0.12, 0.95, s * 1.3, 1.75, 0.1); k.box('vc', 0.12, 0.35, 0.5, s * 1.55, 1.52, 0.1, dark); k.cyl('vc', 0.27, 1.7, s * 1.55, 1.25, 0.15, '#3a3d34', 'z', 8); k.cyl('vc', 0.2, 0.06, s * 1.55, 1.25, 1.01, '#1d1e22', 'z', 8);
+      for (const x of [1.95, 2.2]) k.cyl('vc', 0.085, 1.6, s * x, 1.55, 0.2, '#e4e4dc', 'z', 6);
+      k.cyl('vc', 0.32, 0.18, s * 0.95, 0.32, 1.3, '#1b1b1d', 'x', 10); k.box('vc', 0.09, 0.82, 0.09, s * 0.72, 0.66, 1.3, dark, 0, 0, s * 0.58); }
+    k.sph('vc', 0.26, 0, 1.0, 3.6, '#2a2c30'); k.cyl('vc', 0.05, 1.4, 0, 0.95, 4.35, dark, 'z', 6); k.cyl('vc', 0.14, 0.5, 0, 3.05, 0, dark);
+    k.raw('paint', geoT(wingGeo([[0, -8.1], [1.6, -8.0], [1.6, -7.35], [0, -6.8]], 0.08), 0.04, 2.35, 0, 0, 0, Math.PI / 2)); k.box('paint', 2.4, 0.07, 0.6, 0, 2.2, -7.2);
+    k.cyl('vc', 0.16, 0.1, 0, 0.16, -7.0, '#1b1b1d', 'x', 8); k.box('vc', 0.06, 1.85, 0.06, 0, 1.08, -7.0, dark);
+    _airCache[type] = { custom: true, geos: k.geos(), seat: V3(0, 1.62, 1.2), len: 14.5, wid: 4.6, height: 3.8, gearH: 0, rotors: [[0, 3.3, 0, 6.2, 4, 0.36]], tail: [-0.3, 2.85, -7.6, 1.2], nav: [[0xff2020, 2.05, 1.75, 0.1], [0x20ff40, -2.05, 1.75, 0.1]] };
+  } else if (type === 'blimp') {
+    const env = []; for (let i = 0; i <= 16; i++) { const z = -21 + i / 16 * 42, r = 5.6 * Math.sqrt(Math.max(0, 1 - Math.pow((z - 1.5) / (z > 1.5 ? 19.5 : 22.5), 2))); env.push([z, Math.max(r, 0.05), Math.max(r, 0.05), 9.2, 16]); } fus(env);
+    const fin = wingGeo([[0, -21.5], [7.2, -22.2], [7.2, -19.8], [0, -13.5]], 0.14); for (let i = 0; i < 4; i++) k.raw('vc', geoT(fin, 0, 9.2, 0, 0, 0, Math.PI / 4 + i * Math.PI / 2), i % 2 ? '#1d2b4a' : '#c1121f');
+    k.add('vc', CG.frus(0.9, 0.85), 0, 2.55, 3.2, 2.3, 2.1, 7.0, '#f0f0ec'); k.box('glass', 2.34, 0.7, 5.0, 0, 2.75, 3.3); k.raw('glass', polyGeo([V3(-0.9, 2.2, 6.62), V3(0.9, 2.2, 6.62), V3(0.85, 3.1, 6.45), V3(-0.85, 3.1, 6.45)], V3(0, 2.6, 4)));
+    for (const s of [1, -1]) { k.box('vc', 1.3, 0.18, 0.5, s * 1.75, 2.6, 0.2, '#8a8e94'); k.add('vc', CG.tor(0.08, 16), s * 2.75, 2.6, 0.05, 1.9, 1.9, 1.9, '#c8ccd2'); k.cyl('vc', 0.22, 0.9, s * 2.75, 2.6, 0.45, '#3a3d42', 'z', 8); }
+    k.cyl('vc', 0.32, 0.22, 0, 0.32, 3.6, '#1b1b1d', 'x', 10); k.box('vc', 0.1, 1.0, 0.1, 0, 1.0, 3.6, dark);
+    _airCache[type] = { custom: true, geos: k.geos(), seat: V3(0.55, 1.75, 5.4), len: 42, wid: 11, height: 14.8, gearH: 0, props: [[2.75, 2.6, -0.05, 0.85, 3], [-2.75, 2.6, -0.05, 0.85, 3]], banner: [9.2, 1.5, 19.5, 22.5, 5.6, -11, 11, 0.36], nav: [[0xff2020, 5.7, 9.2, 1.5], [0x20ff40, -5.7, 9.2, 1.5], [0xffffff, 0, 14.85, 1.5]] };
   } else { // Helikopter
     fus([[-1.4, 0.55, 0.6, 1.6, 10], [-0.4, 1.05, 1.0, 1.75, 10], [0.8, 1.1, 1.05, 1.72, 10], [1.8, 0.92, 0.9, 1.62, 10], [2.5, 0.5, 0.55, 1.45, 10], [2.8, 0.08, 0.1, 1.4, 10]]);
     fus([[-6.6, 0.12, 0.16, 2.2, 6], [-1.2, 0.3, 0.42, 2.0, 6]]);
@@ -626,23 +782,46 @@ function airGeos(type) {
   }
   return _airCache[type];
 }
+// Werbeband auf der Zeppelinhülle: Gitter direkt auf der Hüllform, beide Seiten lesbar
+let _bannerTex = null;
+function bannerMesh([cy, zc, af, ab, R, z0, z1, a0]) {
+  if (!_bannerTex) { const c = document.createElement('canvas'); c.width = 1024; c.height = 160; const x = c.getContext('2d'); x.fillStyle = '#1d2b4a'; x.fillRect(0, 0, 1024, 160); x.fillStyle = '#ffcc00'; x.fillRect(0, 10, 1024, 6); x.fillRect(0, 144, 1024, 6);
+    x.font = 'bold 104px "Arial Black", Impact, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('VISIT SOLARA', 512, 84); _bannerTex = new THREE.CanvasTexture(c); _bannerTex.colorSpace = THREE.SRGBColorSpace; _bannerTex.anisotropy = 4; }
+  const pos = [], uv = [], idx = [], NZ = 18, NA = 4;
+  for (const s of [1, -1]) { const base = pos.length / 3;
+    for (let i = 0; i <= NZ; i++) { const z = lerp(z0, z1, i / NZ), r = R * Math.sqrt(Math.max(0, 1 - Math.pow((z - zc) / (z > zc ? af : ab), 2))) * 1.015; for (let j = 0; j <= NA; j++) { const a = lerp(-a0, a0, j / NA); pos.push(s * Math.cos(a) * r, cy + Math.sin(a) * r, z); uv.push(s > 0 ? 1 - i / NZ : i / NZ, j / NA); } }
+    for (let i = 0; i < NZ; i++) for (let j = 0; j < NA; j++) { const a = base + i * (NA + 1) + j, b = a + NA + 1; if (s > 0) idx.push(a, a + 1, b, b, a + 1, b + 1); else idx.push(a, b, a + 1, b, b + 1, a + 1); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: _bannerTex }));
+}
 function buildAircraft(type, color) {
   const A = airGeos(type), G2 = A.geos, grp = new THREE.Group(), body = new THREE.Group(); grp.add(body); const pm = paintMat(color);
   const add = (g, m, cast = true) => { if (!g) return; const mm = new THREE.Mesh(g, m); mm.castShadow = cast; body.add(mm); return mm; };
-  add(G2.paint, pm); add(G2.vc, MAT.vehVC); add(G2.glass, MAT.glassDark, false);
-  const res = { group: grp, body, paint: null, wheels: [], tailMat: tailMatNew(), gear: null, rotor: null, tailRotor: null, prop: null, burner: null, seat: A.seat.clone(), pose: 'sit', len: A.len, wid: A.wid, height: A.height, gearH: A.gearH };
+  add(G2.paint, pm); add(G2.vc, MAT.vehVC); add(G2.glass, MAT.glassDark, false); add(G2.chrome, MAT.chrome);
+  const res = { group: grp, body, paint: null, wheels: [], tailMat: tailMatNew(), gear: null, rotor: null, rotor2: null, tailRotor: null, prop: null, props: [], burner: null, bar: null, beam: null, seat: A.seat.clone(), pose: 'sit', len: A.len, wid: A.wid, height: A.height, gearH: A.gearH };
   if (type === 'jet') {
     const burnMat = new THREE.MeshBasicMaterial({ color: 0xff8a3a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
     res.burner = new THREE.Mesh(new THREE.ConeGeometry(0.42, 3.2, 10, 1, true), burnMat); res.burner.rotation.x = -Math.PI / 2; res.burner.position.set(0, 1.72, -10.2); body.add(res.burner);
     const gear = new THREE.Group(); for (const [x, z] of [[0, 4.5], [1.4, -1.5], [-1.4, -1.5]]) { const s = new THREE.Mesh(CG.cyl(6), MAT.chrome); s.scale.set(0.12, 1.3, 0.12); s.position.set(x, 0.95, z); gear.add(s); const t = new THREE.Mesh(CG.cyl(12), MAT.tire); t.scale.set(0.66, 0.22, 0.66); t.rotation.z = Math.PI / 2; t.position.set(x, 0.33, z); gear.add(t); } body.add(gear); res.gear = gear;
   } else if (type === 'plane') {
     const prop = new THREE.Group(); prop.position.set(0, 1.55, 4.42); const pg = mergeGeos([geoT(CG.box(), 0, 0.5, 0, 0, 0.3, 0, 0.14, 1.0, 0.03), geoT(CG.box(), 0, -0.5, 0, 0, -0.3, 0, 0.14, 1.0, 0.03)]); prop.add(new THREE.Mesh(pg, MAT.trim)); body.add(prop); res.prop = prop;
-  } else {
+  } else if (!A.custom) {
     const rotor = new THREE.Group(); rotor.position.set(0, 3.45, 0.2); rotor.add(new THREE.Mesh(mergeGeos([0, 1, 2, 3].map(k => geoT(CG.box(), Math.sin(k * Math.PI / 2) * 2.8, 0, Math.cos(k * Math.PI / 2) * 2.8, 0, k * Math.PI / 2, 0, 0.3, 0.04, 5.6)).concat([geoT(CG.cyl(8), 0, 0, 0, 0, 0, 0, 0.4, 0.2, 0.4)])), MAT.trim)); body.add(rotor); res.rotor = rotor;
     const tr = new THREE.Group(); tr.position.set(0.22, 2.35, -6.55); tr.add(new THREE.Mesh(mergeGeos([geoT(CG.box(), 0, 0, 0, 0, 0, 0, 0.03, 1.5, 0.15), geoT(CG.box(), 0, 0, 0, 0, 0, 0, 0.03, 0.15, 1.5)]), MAT.trim)); body.add(tr); res.tailRotor = tr;
+  } else {
+    // Propeller (drehen um z), Rotoren (drehen um y), Heckrotor (um x), einziehbares Fahrwerk
+    for (const [x, y, z, R, n] of A.props || []) { const pr = new THREE.Group(); pr.position.set(x, y, z); const gs = [geoT(CG.cyl(8), 0, 0, 0.02, Math.PI / 2, 0, 0, R * 0.22, 0.12, R * 0.22)]; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + 0.4; gs.push(geoT(CG.box(), Math.cos(a) * R / 2, Math.sin(a) * R / 2, 0, 0, 0, a, R, Math.max(0.12, R * 0.12), 0.035)); } pr.add(new THREE.Mesh(mergeGeos(gs), MAT.trim)); body.add(pr); res.props.push(pr); }
+    const rot = (x, y, z, R, n, w) => { const r = new THREE.Group(); r.position.set(x, y, z); const gs = [geoT(CG.cyl(8), 0, 0, 0, 0, 0, 0, Math.max(0.4, R * 0.08), 0.22, Math.max(0.4, R * 0.08))]; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; gs.push(geoT(CG.box(), Math.sin(a) * R / 2, 0, Math.cos(a) * R / 2, 0, a, 0, w, 0.05, R)); } r.add(new THREE.Mesh(mergeGeos(gs), MAT.trim)); body.add(r); return r; };
+    if (A.rotors) { res.rotor = rot(...A.rotors[0]); if (A.rotors[1]) res.rotor2 = rot(...A.rotors[1]); }
+    if (A.tail) { const [x, y, z, R] = A.tail, tr = new THREE.Group(); tr.position.set(x, y, z); tr.add(new THREE.Mesh(mergeGeos([geoT(CG.box(), 0, 0, 0, 0, 0, 0, 0.03, R * 2, 0.15), geoT(CG.box(), 0, 0, 0, 0, 0, 0, 0.03, 0.15, R * 2)]), MAT.trim)); body.add(tr); res.tailRotor = tr; }
+    if (A.gearPts) { const gear = new THREE.Group(); for (const [x, z, r, h] of A.gearPts) { const s = new THREE.Mesh(CG.cyl(6), MAT.chrome); s.scale.set(0.16, h - r, 0.16); s.position.set(x, (h + r) / 2, z); gear.add(s); const t = new THREE.Mesh(CG.cyl(12), MAT.tire); t.scale.set(r * 2, Math.max(0.24, r * 0.75), r * 2); t.rotation.z = Math.PI / 2; t.position.set(x, r, z); gear.add(t); } body.add(gear); res.gear = gear; }
+    if (A.bar) { res.bar = [new THREE.MeshStandardMaterial({ color: 0x400000, emissive: 0xff1010, emissiveIntensity: 0.2 }), new THREE.MeshStandardMaterial({ color: 0x000040, emissive: 0x1050ff, emissiveIntensity: 0.2 })]; A.bar.forEach(([x, y, z], i) => { const m = new THREE.Mesh(CG.box(), res.bar[i]); m.scale.set(0.3, 0.14, 0.24); m.position.set(x, y, z); body.add(m); }); }
+    if (A.beam) { const bm = new THREE.Mesh(new THREE.ConeGeometry(5, 46, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff2c8, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false }));
+      bm.geometry.translate(0, -23, 0); bm.position.set(...A.beam); bm.rotation.x = -0.55; bm.visible = false; body.add(bm); res.beam = bm; }
+    if (A.banner) body.add(bannerMesh(A.banner));
   }
-  const nav = type === 'jet' ? [[0xff2020, 5.45, 1.45, -3.1], [0x20ff40, -5.45, 1.45, -3.1]] : type === 'plane' ? [[0xff2020, 5.5, 2.4, 0.9], [0x20ff40, -5.5, 2.4, 0.9]] : [[0xff2020, 0, 2.3, -6.6], [0x20ff40, 0, 1.0, 2.6]];
-  for (const [c, x, y, z] of nav) { const m = new THREE.Mesh(CG.sph(6), new THREE.MeshBasicMaterial({ color: c, toneMapped: false })); m.scale.setScalar(0.18); m.position.set(x, y, z); body.add(m); }
+  const nav = A.nav || (type === 'jet' ? [[0xff2020, 5.45, 1.45, -3.1], [0x20ff40, -5.45, 1.45, -3.1]] : type === 'plane' ? [[0xff2020, 5.5, 2.4, 0.9], [0x20ff40, -5.5, 2.4, 0.9]] : [[0xff2020, 0, 2.3, -6.6], [0x20ff40, 0, 1.0, 2.6]]);
+  for (const [c, x, y, z] of nav) { const m = new THREE.Mesh(CG.sph(6), new THREE.MeshBasicMaterial({ color: c, toneMapped: false })); m.scale.setScalar(A.len > 30 ? 0.35 : 0.18); m.position.set(x, y, z); body.add(m); }
   return res;
 }
 function buildVehicleModel(type, color) {

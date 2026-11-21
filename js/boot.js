@@ -2,7 +2,7 @@
 //  VICE LEGACY – Lader: Three.js (lokal), Zusatzmodule, danach die Spielskripte
 //  Die Spielskripte sind klassische Skripte und teilen sich den globalen Bereich.
 // =====================================================================
-const VER = '5.0.0';
+const VER = '5.1.0';
 const msg = (t) => { const e = document.getElementById('loadMsg'); if (e) e.textContent = t; window.__loadWatch && window.__loadWatch(); };
 const bar = (f) => { const e = document.getElementById('loadFill'); if (e) e.style.width = Math.round(f * 100) + '%'; };
 window.__loadMsg = msg; window.__loadBar = bar; window.__VER = VER;
