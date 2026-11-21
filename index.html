@@ -339,8 +339,8 @@ const CFG = {
   WORLD: 1200, GRID: 385, WATER_Y: 0, GRAVITY: 9.81, DAY_LENGTH: 900, START_TIME: 17.3,
   QUALITY: {
     low:    { label: 'Niedrig', pr: 0.8, shadows: false, shadowSize: 1024, reflect: 0,    post: false, msaa: 0, peds: 10, traffic: 8,  particles: 700,  rain: 700,  lights: 2, far: 900,  trees: 0.35, terrainStep: 2, detail: 0 },
-    medium: { label: 'Mittel',  pr: 1.0, shadows: true,  shadowSize: 1024, reflect: 512,  post: true,  msaa: 0, peds: 18, traffic: 14, particles: 1400, rain: 1600, lights: 4, far: 1400, trees: 0.7,  terrainStep: 1, detail: 1 },
-    high:   { label: 'Hoch',    pr: Math.min(devicePixelRatio || 1, 1.5), shadows: true, shadowSize: 2048, reflect: 768, post: true, msaa: 4, peds: 26, traffic: 20, particles: 2200, rain: 2600, lights: 6, far: 2000, trees: 1, terrainStep: 1, detail: 2 },
+    medium: { label: 'Mittel',  pr: 1.0, shadows: true,  shadowSize: 1024, reflect: 512,  post: true,  msaa: 0, peds: 22, traffic: 16, particles: 1400, rain: 1600, lights: 4, far: 1400, trees: 0.7,  terrainStep: 1, detail: 1 },
+    high:   { label: 'Hoch',    pr: Math.min(devicePixelRatio || 1, 1.5), shadows: true, shadowSize: 2048, reflect: 768, post: true, msaa: 4, peds: 30, traffic: 22, particles: 2200, rain: 2600, lights: 6, far: 2000, trees: 1, terrainStep: 1, detail: 2 },
     ultra:  { label: 'Ultra',   pr: Math.min(devicePixelRatio || 1, 2), shadows: true, shadowSize: 4096, reflect: 1024, post: true, msaa: 4, peds: 32, traffic: 26, particles: 3000, rain: 3200, lights: 8, far: 2400, trees: 1, terrainStep: 1, detail: 2 },
   },
   WEATHER: [
@@ -915,7 +915,7 @@ class Environment {
     this.cloudMat.emissive.copy(c.hor).multiplyScalar(0.35 * (1 - baseNight * 0.7)); this.cloudMat.opacity = clamp(0.75 + this.w.turb * 0.02, 0, 0.98);
     // Ozean
     const wu = this.waterU; wu.uTime.value += dt; wu.uSky.value.copy(c.hor).lerp(c.top, 0.3); wu.uSunCol.value.copy(c.sun).multiplyScalar(this.sun.intensity / 2.5 * (this.sunDir.y > 0 ? 1 : 0.3)); wu.uSunDir.value.copy(lightDir);
-    wu.uAmb.value = lerp(1, 0.22, this.night); wu.uWave.value = 0.5 + this.w.wind * 0.5;
+    wu.uAmb.value = lerp(1, 0.13, this.night); wu.uWave.value = 0.5 + this.w.wind * 0.5;
     this.water.position.x = Math.round(camera.position.x / 15) * 15; this.water.position.z = Math.round(camera.position.z / 15) * 15;
     // Nachtwerte
     const n = this.night; NIGHT_U.value = n; MAT.glow.color.setScalar(0.75 + n * 0.9); for (const m of neonMats) m.color.setScalar(0.45 + n * 1.1);
@@ -1502,7 +1502,7 @@ function bHouse(F, w, d, L, o = {}) {
   PB(F, doorX, 0, d / 2 + 0.7, 1.8, 0.3, 1.2, '#d8d0c4');
   facade(F, w, d, 0.3, two ? 2 : 1, 3.0, { sp: 3.4, ww: 1.2, wh: 1.4, door: doorX, shutters: srand() < 0.5 ? spick(PAL.accent) : null });
   // Garage + Einfahrt
-  const gx = w / 2 + 2.3, gh = 3.0; PB(F, gx, 0.3, -0.5, 4.4, gh, Math.min(d, 7), wall); PB(F, gx, 0.3 + gh, -0.5, 4.8, 0.3, Math.min(d, 7) + 0.4, trim);
+  const gx = w / 2 + 2.3, gh = 3.0; PB(F, gx, 0.3, -0.5, 4.4, gh, Math.min(d, 7), wall); { const gp = LP(F, gx, 0, -0.5), e = F.elements; World.addOBB(gp.x, gp.z, 2.2, Math.min(d, 7) / 2, Math.atan2(e[8], e[10]), gp.y + 3.3, gp.y - 2, 'building'); } PB(F, gx, 0.3 + gh, -0.5, 4.8, 0.3, Math.min(d, 7) + 0.4, trim);
   PB(F, gx, 0.3, Math.min(d, 7) / 2 - 0.45, 3.4, 2.4, 0.1, '#e8e8e8'); for (let k = 1; k < 4; k++) PB(F, gx, 0.3 + k * 0.6, Math.min(d, 7) / 2 - 0.39, 3.4, 0.04, 0.04, '#c8c8c8');
   PB(F, gx, -1.2, Math.min(d, 7) / 2 + 4, 3.6, 1.34, 8, '#9a9890');
   // Grundstück: Hecke, Briefkasten, Klimagerät, Pool
@@ -1510,7 +1510,7 @@ function bHouse(F, w, d, L, o = {}) {
   PB(F, -w / 2 + 0.8, 0, d / 2 + 4.6, 0.12, 1.1, 0.12, '#666'); PB(F, -w / 2 + 0.8, 1.1, d / 2 + 4.6, 0.35, 0.3, 0.55, spick(['#2a5aa0', '#ffffff', '#c0392b']));
   acUnit(F, -w / 2 - 0.5, 0.3, -d * 0.2, Math.PI / 2);
   if (srand() < 0.45 && det > 0) { PB(F, 0, 0.0, -d / 2 - 5, 9, 0.35, 5.5, '#f4f0e8'); part(F, G.box(), 0, 0.31, -d / 2 - 5, 8, 0.06, 4.5, '#38c8e8', { mat: 'shiny' }); for (const sx of [-2.5, 2.5]) PB(F, sx, 0.35, -d / 2 - 1.8, 0.8, 0.3, 1.9, '#ffffff'); }
-  if (srand() < 0.5) propCar(F, gx, d / 2 + 4.2, Math.PI, spick(PAL.car));
+  if (srand() < 0.5 && !o.noCar) propCar(F, gx, d / 2 + 4.2, Math.PI, spick(PAL.car));
   return { top: 0.3 + h, flat: false };
 }
 function bShops(F, w, d, L) {
@@ -1583,9 +1583,9 @@ function flattenRect(cx, cz, hx, hz, yaw, y, pad = 4, fall = 8) {
 function placeBuilding(L, fn, opts) {
   flattenRect(L.x, L.z, L.w / 2, L.d / 2, L.yaw, L.y + 0.08, fn === bHouse ? 7 : 3, 7);
   const F = FR(L.x, L.y, L.z, L.yaw); const r = fn(F, L.w, L.d, L, opts) || { top: 6 }; L.top = r.top;
-  const dd = r.depthUsed || L.d, oz = r.depthUsed ? -(L.d - dd) / 2 : 0, cx = L.x + Math.sin(L.yaw) * oz, cz = L.z + Math.cos(L.yaw) * oz;
-  World.addOBB(cx, cz, L.w / 2, dd / 2, L.yaw, L.y + r.top, L.y - 3, 'building'); if (r.flat) World.addRoof(cx, cz, L.w / 2, dd / 2, L.yaw, L.y + r.top);
-  BLD.push({ x: cx, z: cz, w: L.w, d: dd, yaw: L.yaw, h: r.top }); return F;
+  const dd = r.obbD || r.depthUsed || L.d, ww = r.obbW || L.w, oz = r.depthUsed ? -(L.d - dd) / 2 : 0, cx = L.x + Math.sin(L.yaw) * oz, cz = L.z + Math.cos(L.yaw) * oz;
+  World.addOBB(cx, cz, ww / 2, dd / 2, L.yaw, L.y + r.top, L.y - 3, 'building'); if (r.flat) World.addRoof(cx, cz, ww / 2, dd / 2, L.yaw, L.y + r.top);
+  BLD.push({ x: cx, z: cz, w: ww, d: dd, yaw: L.yaw, h: r.top }); return F;
 }
 function zoneAt(x, z) {
   if (Math.abs(x - BASE.x) < BASE.hx + 25 && Math.abs(z - BASE.z) < BASE.hz + 25) return 'base';
@@ -1652,8 +1652,8 @@ function buildSpecials() {
     LOC.police = L.front; LOC.police.yaw = L.yaw; PICKUP_SPOTS.push(['armor', L.front.x, L.front.z]); const pp = lotPoint(L, -6, L.d / 2 - 4); PARKED.push(['police', pp.x, pp.z, L.yaw + Math.PI]); const pp2 = lotPoint(L, 4, L.d / 2 - 4); PARKED.push(['police', pp2.x, pp2.z, L.yaw + Math.PI]); }
   // Kais Safehouse
   L = specialLot(SUBURB.x + 20, SUBURB.z - 20, 20, 22);
-  if (L) { placeBuilding(L, (F, w, d) => { const r = bHouse(F, 13, 11, L, { wall: '#f8f0e0' }); Signs.quad(F, -3.5, 2.6, 5.6, 1.6, 0.4, 0, Signs.cell('KAI', '#1fb5a8', '#fff')); return r; });
-    LOC.safehouse = L.front; LOC.safehouse.yaw = L.yaw; const cp = lotPoint(L, 0, L.d / 2 + 1.5); PARKED.push(['muscle', cp.x + 3, cp.z, L.yaw + Math.PI]); const bp = lotPoint(L, -5, L.d / 2 + 1.5); PARKED.push(['bike', bp.x, bp.z, L.yaw + Math.PI]); }
+  if (L) { placeBuilding(L, (F, w, d) => { const r = bHouse(F, 13, 11, L, { wall: '#f8f0e0', noCar: true }); Signs.quad(F, -3.5, 2.6, 5.6, 1.6, 0.4, 0, Signs.cell('KAI', '#1fb5a8', '#fff')); return Object.assign(r, { obbW: 13, obbD: 11 }); });
+    LOC.safehouse = L.front; LOC.safehouse.yaw = L.yaw; const cp = lotPoint(L, 8.8, 7.2); PARKED.push(['muscle', cp.x, cp.z, L.yaw + Math.PI]); const bp = lotPoint(L, 5.6, 8.2); PARKED.push(['bike', bp.x, bp.z, L.yaw + Math.PI * 0.85]); }
   // Parkplatz Mission 1 (mit Kiosk)
   L = specialLot(SUBURB.x - 150, SUBURB.z + 110, 42, 30);
   if (L) { reserve(L); const F = FR(L.x, L.y, L.z, L.yaw); paved(F, L.w, L.d); parkLines(F, -L.w / 2 + 3, L.w / 2 - 3, -L.d / 2 + 5, 5); parkLines(F, -L.w / 2 + 3, L.w / 2 - 3, L.d / 2 - 5, 5);
@@ -1666,7 +1666,7 @@ function buildSpecials() {
     PB(F, 0, -1, 0, L.w, 1.25, L.d, '#e6d6bc'); for (let i = -2; i <= 2; i++) PB(F, i * 6, 0.25, 0, 0.3, 0.02, L.d, '#d0c0a4');
     PC(F, 0, 0.25, 0, 4.6, 0.8, '#f4f4f0', { seg: 20 }); part(F, G.cyl(20), 0, 0.9, 0, 8.4, 0.15, 8.4, '#3fc8e8', { mat: 'shiny' }); PC(F, 0, 0.25, 0, 0.7, 3.4, '#ffffff', { seg: 12 }); PC(F, 0, 3.6, 0, 1.6, 0.25, '#ffffff', { seg: 12 });
     for (let a = 0; a < 8; a++) { const x = Math.cos(a / 8 * Math.PI * 2) * 13, z = Math.sin(a / 8 * Math.PI * 2) * 13; const p = LP(F, x, 0, z); TREES.push({ t: 'palm', x: p.x, z: p.z, s: 1 }); PB(F, x * 1.2, 0.25, z * 1.2, 2.2, 0.45, 0.6, '#8a6a4a', { ry: Math.atan2(x, z) }); }
-    signF(F, 'NEON PLAZA', '#ff2d95', 0, 5, L.d / 2 + 0.5, 12, 2.6); LOC.plaza = L.front; }
+    signF(F, 'NEON PLAZA', '#ff2d95', 0, 5, L.d / 2 + 0.5, 12, 2.6); LOC.plaza = L.front; LOC.plaza.yaw = L.yaw; }
   // Chop Shop
   L = specialLot(PORT.x - 60, PORT.z - 40, 40, 28);
   if (L) { placeBuilding(L, (F, w, d) => { const r = bWarehouse(F, w, d, L); signF(F, 'CHOP SHOP', '#ffb03a', 0, 9.5, d / 2 + 0.4, 12, 2.6); return r; }); LOC.chop = L.front; }
@@ -1679,7 +1679,7 @@ function buildSpecials() {
     PB(F, 0, 0, -L.d / 2 + 5, 15, 4.4, 8, '#f0ece4'); PB(F, 0, 4.4, -L.d / 2 + 5, 15.4, 0.5, 8.4, brand); PW(F, -1.5, 1.8, -L.d / 2 + 9.05, 9, 2.4, 0, 0xfff1c8, '#8ab0c8'); PB(F, 4.5, 0, -L.d / 2 + 9.05, 1.6, 2.4, 0.1, '#5a7a9a');
     Signs.quad(F, 0, 4.5, -L.d / 2 + 9.3, 8, 1.1, 0, Signs.cell(name, brand, '#fff')); const sp = LP(F, 0, 0, -L.d / 2 + 5); World.addOBB(sp.x, sp.z, 7.5, 4, L.yaw, L.y + 4.6);
     PB(F, L.w / 2 - 2, 0, L.d / 2 - 2, 0.4, 7, 0.4, '#8a8a90'); Signs.quad(F, L.w / 2 - 2, 7, L.d / 2 - 1.7, 3.2, 1.3, 0, Signs.cell(name, brand, '#fff')); Signs.quad(F, L.w / 2 - 2, 5.4, L.d / 2 - 1.7, 3.2, 1.3, 0, Signs.cell('SUPER 3.49', '#111', '#ffd23a'));
-    World.lampAnchors.push(LP(F, -4, 4.6, 2), LP(F, 4, 4.6, 2)); PICKUP_SPOTS.push(['ammo', L.front.x, L.front.z]);
+    World.lampAnchors.push(LP(F, -4, 4.6, 2), LP(F, 4, 4.6, 2)); PICKUP_SPOTS.push(['ammo', L.front.x, L.front.z]); if (!LOC.gas) { LOC.gas = L.front.clone(); LOC.gas.yaw = L.yaw; }
   }
   // Diner
   L = specialLot(DOWNTOWN.x - 280, DOWNTOWN.z - 40, 24, 16);
@@ -1688,7 +1688,7 @@ function buildSpecials() {
   buildStadium(); buildPier();
 }
 function buildStadium() {
-  const L = specialLot(DOWNTOWN.x + 30, DOWNTOWN.z - 300, 110, 90); if (!L) return; reserve(L); const F = FR(L.x, L.y, L.z, L.yaw);
+  const L = specialLot(DOWNTOWN.x + 30, DOWNTOWN.z - 300, 110, 90); if (!L) return; reserve(L); LOC.stadium = V3(L.x, L.y, L.z); LOC.stadium.yaw = L.yaw; const F = FR(L.x, L.y, L.z, L.yaw);
   PB(F, 0, -1, 0, L.w, 1.1, L.d, '#9a9a94'); PB(F, 0, 0.1, 0, 60, 0.1, 36, '#3a9a3a'); for (let i = -2; i <= 2; i++) PB(F, i * 12, 0.2, 0, 6, 0.02, 36, '#48a848');
   PB(F, 0, 0.21, 0, 60, 0.02, 0.2, '#ffffff'); PC(F, 0, 0.21, 0, 4.5, 0.02, '#ffffff', { seg: 20 }); PC(F, 0, 0.215, 0, 4.3, 0.02, '#3a9a3a', { seg: 20 });
   const N = 28; for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2, c = Math.cos(a), s = Math.sin(a), rx = 46, rz = 34; for (let k = 0; k < 4; k++) part(F, G.box(), c * (rx + k * 2.4), 0.1 + k * 1.8, s * (rz + k * 2.4), 2.2, 1.8, 2 * Math.PI * (rx + 4) / N + 1, k % 2 ? '#d8d8d8' : spick(['#1f6fd0', '#c8202a']), { ry: Math.atan2(c / rx, s / rz) }); }
@@ -2168,7 +2168,7 @@ class Humanoid {
     if (s.air) { T.tL = -0.7; T.sL = 1.0; T.tR = 0.25; T.sR = 0.4; T.uaL = -0.6; T.uaR = -0.6; }
     if (s.crouch) { T.hipsY = 0.62; T.tL = -1.25 + T.tL * 0.25; T.tR = -1.25 + T.tR * 0.25; T.sL = 1.9; T.sR = 1.9; T.fL = T.fR = -0.6; T.spineX = 0.35; }
     if (s.sit) {
-      if (s.bike) { T.hipsY = 0.12; T.tL = T.tR = -1.05; T.sL = T.sR = 1.75; T.fL = T.fR = -0.45; T.uaL = T.uaR = -0.3; T.faL = T.faR = -0.25; T.tLz = 0.28; T.spineX = 0.62; T.uaLz = 0.22; T.uaRz = -0.22; T.chestY = 0; }
+      if (s.bike) { T.hipsY = 0.12; T.tL = T.tR = -1.05; T.sL = T.sR = 1.75; T.fL = T.fR = -0.45; T.uaL = T.uaR = -1.43; T.faL = T.faR = -0.15; T.tLz = 0.28; T.spineX = 0.48; T.uaLz = 0.22; T.uaRz = -0.22; T.chestY = 0; }
       else { T.hipsY = 0.12; T.tL = T.tR = -1.5; T.sL = T.sR = 1.45; T.fL = T.fR = -0.1; T.uaL = T.uaR = -0.95; T.faL = T.faR = -0.55; T.spineX = -0.12; T.uaLz = 0.12; T.uaRz = -0.12; T.chestY = 0; }
     }
     if (s.swim) { T.rootX = 1.35; T.rootY = 0.15; T.uaL = Math.sin(ph * 0.8) * 2.6; T.uaR = Math.sin(ph * 0.8 + Math.PI) * 2.6; T.faL = T.faR = -0.3; T.tL = Math.sin(ph * 1.5) * 0.35; T.tR = -T.tL; T.sL = T.sR = 0.2; }
@@ -2314,8 +2314,8 @@ function buildBike(color) {
     k.box('vc', 0.28, 0.08, 0.5, 0, 0.92, -0.25, '#2a2a2e', 0.05); k.box('vc', 0.22, 0.06, 0.3, 0, 1.0, -0.6, '#2a2a2e', -0.25);
     k.raw('glass', polyGeo([V3(-0.16, 1.02, 0.78), V3(0.16, 1.02, 0.78), V3(0.11, 1.24, 0.62), V3(-0.11, 1.24, 0.62)], V3(0, 0.9, 0.5)));
     // Gabel, Lenker, Spiegel
-    for (const s of [1, -1]) { k.cyl('chrome', 0.03, 0.72, s * 0.1, 0.62, 0.86, null, 'y', 6, -0.42); k.box('vc', 0.045, 0.045, 0.16, s * 0.25, 1.12, 0.47, dark, 0, 0.25 * s); k.box('vc', 0.025, 0.14, 0.025, s * 0.2, 1.2, 0.6, dark); k.box('vc', 0.1, 0.06, 0.02, s * 0.2, 1.28, 0.6, '#9fb0c0'); }
-    k.box('vc', 0.5, 0.035, 0.035, 0, 1.12, 0.48, dark); k.box('vc', 0.06, 0.06, 0.2, 0.16, 0.52, -0.12, dark); k.box('vc', 0.06, 0.06, 0.2, -0.16, 0.52, -0.12, dark); // Fußrasten
+    for (const s of [1, -1]) { k.cyl('chrome', 0.03, 0.72, s * 0.1, 0.62, 0.86, null, 'y', 6, -0.42); k.box('vc', 0.045, 0.045, 0.16, s * 0.25, 1.15, 0.41, dark, 0, 0.25 * s); k.box('vc', 0.025, 0.14, 0.025, s * 0.2, 1.2, 0.6, dark); k.box('vc', 0.1, 0.06, 0.02, s * 0.2, 1.28, 0.6, '#9fb0c0'); }
+    k.box('vc', 0.5, 0.035, 0.035, 0, 1.15, 0.42, dark); k.box('vc', 0.06, 0.06, 0.2, 0.16, 0.52, -0.12, dark); k.box('vc', 0.06, 0.06, 0.2, -0.16, 0.52, -0.12, dark); // Fußrasten
     k.box('vc', 0.18, 0.04, 0.4, 0, 0.62, 0.95, dark, -0.4); k.box('vc', 0.18, 0.04, 0.35, 0, 0.6, -0.72, dark, 0.5); // Schutzbleche
     k.box('head', 0.16, 0.08, 0.05, 0, 0.95, 0.88, null, -0.35); k.box('tail', 0.14, 0.05, 0.04, 0, 1.0, -0.84);
     k.box('vc', 0.06, 0.05, 0.04, 0.09, 0.92, 0.86, '#ffa020'); k.box('vc', 0.06, 0.05, 0.04, -0.09, 0.92, 0.86, '#ffa020');
@@ -2326,7 +2326,7 @@ function buildBike(color) {
   const wr = 0.31, wheels = [];
   for (const [z, front] of [[0.74, 1], [-0.72, 0]]) { const piv = new THREE.Group(); piv.position.set(0, wr, z); const spin = new THREE.Group(); piv.add(spin); const t = new THREE.Mesh(G2.wheel.tire, MAT.tire); t.castShadow = true; spin.add(t); spin.add(new THREE.Mesh(G2.wheel.rim, MAT.rim));
     const disc = new THREE.Mesh(CG.cyl(12), MAT.chrome); disc.scale.set(0.38, 0.015, 0.38); disc.rotation.z = Math.PI / 2; disc.position.x = 0.09; spin.add(disc); grp.add(piv); wheels.push({ piv, spin, front: !!front, x: 0, z, rest: wr }); }
-  return { group: grp, body, paint: null, wheels, tailMat, seat: V3(0, 0.9, -0.28), len: 2.1, wid: 0.8, height: 1.3, wr, pose: 'bike' };
+  return { group: grp, body, paint: null, wheels, tailMat, seat: V3(0, 0.95, -0.3), len: 2.1, wid: 0.8, height: 1.3, wr, pose: 'bike' };
 }
 
 // ---------- BOOTE ----------
@@ -2537,7 +2537,7 @@ class Vehicle {
       const drag = -0.5 * 1.2 * S.cd * S.area * vLong * Math.abs(vLong), roll = sp > 0.05 ? -0.015 * m * g * Math.sign(vLong) : 0, slope = -m * g * Math.sin(this.pitch);
       let FL = drive + brakeF + drag + roll + slope; if (Math.abs(brakeF) > 0 && Math.abs(vLong) < 0.4 && !drive) { FL = 0; vLong *= 0.5; }
       // Querkräfte (Schräglaufwinkel)
-      const dmax = (this.isBike ? 0.5 : 0.6) / (1 + sp / 8.5); const d = this.steer * dmax, cd = Math.cos(d), sd = Math.sin(d);
+      const dmax = (this.isBike ? 0.5 : 0.6) / (1 + sp / (this.ai ? 13 : 8.5)); // KI braucht mehr Lenkwinkel für enge Verfolgungen const d = this.steer * dmax, cd = Math.cos(d), sd = Math.sin(d);
       const vLatF = vLat - r * a, vLatR = vLat + r * b, wl = vLong * cd - vLatF * sd, wlat = vLong * sd + vLatF * cd;
       const df = S.downforce ? 1 + sp * 0.006 : 1, Cf = 15 * Nf * df, Cr = 21 * Nr * df; // hecklastig → stabil, leichtes Untersteuern
       let Ff = clamp(-Cf * Math.atan2(wlat, Math.abs(wl) + 0.6), -mu * Nf, mu * Nf);
