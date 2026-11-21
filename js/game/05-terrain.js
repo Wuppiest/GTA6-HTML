@@ -210,6 +210,8 @@ const Roads = {
   edgeBetween(a, b) { for (const ei of this.nodes[a].edges) { const e = this.edges[ei]; if (this.other(e, a) === b) return e; } return null; },
 };
 function coastRadius(th, eTarget) { for (let r = 2150; r > 100; r -= 4) { if (islandE(Math.cos(th) * r, Math.sin(th) * r) >= eTarget) return r; } return 200; }
+// Punkt in Polygon ([x, z]-Paare)
+function pip(x, z, P) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const xi = P[i][0], zi = P[i][1], xj = P[j][0], zj = P[j][1]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; }
 function nearestOf(list, x, z) { let b = null, bd = 1e18; for (const n of list) { if (!n) continue; const d = (n.x - x) ** 2 + (n.z - z) ** 2; if (d < bd) { bd = d; b = n; } } return b; }
 const TAU = Math.PI * 2;
 
@@ -278,9 +280,47 @@ const Net = {
     for (let k = 1; k <= n; k++) { const t = k / n, x = lerp(A.x, B.x, t), z = lerp(A.z, B.z, t), w = islandE(x, z) < 0.004;
       if (w !== wet) { const tb = clamp((wet ? t + 12 / L : t - 12 / L), 0, 1), N = this.node(lerp(A.x, B.x, tb), lerp(A.z, B.z, tb), null, 6); if (N !== prev) { this.link(prev, N, 'street', 0, wet ? { bridge: true } : null); prev = N; } wet = w; } }
     this.link(prev, B, 'street', 0, wet ? { bridge: true } : null); },
+  // Flächen (Baublöcke) des planaren Netzes: Halbkanten-Umlauf, jeweils nächste Kante im Uhrzeigersinn
+  faces() {
+    const out = new Map(), vis = new Map();
+    for (const s of this.segs) { if (!s.alive) continue; for (const fwd of [true, false]) { const P = s.poly, p0 = fwd ? P[0] : P[P.length - 1], p1 = fwd ? P[1] : P[P.length - 2], u = fwd ? s.a : s.b;
+      let a = out.get(u); if (!a) out.set(u, a = []); a.push({ s, fwd, ang: Math.atan2(p1[1] - p0[1], p1[0] - p0[0]) }); } }
+    for (const a of out.values()) a.sort((p, q) => p.ang - q.ang);
+    const faces = [];
+    for (const s of this.segs) { if (!s.alive) continue; for (const fwd of [true, false]) { const bit = fwd ? 1 : 2; if ((vis.get(s) || 0) & bit) continue;
+      const loop = []; let cs = s, cf = fwd;
+      for (let g = 0; g < 600; g++) { vis.set(cs, (vis.get(cs) || 0) | (cf ? 1 : 2)); loop.push([cs, cf]); const v = cf ? cs.b : cs.a, list = out.get(v), i = list.findIndex(o => o.s === cs && o.fwd === !cf), nx = list[(i - 1 + list.length) % list.length];
+        cs = nx.s; cf = nx.fwd; if (cs === s && cf === fwd) break; }
+      const pts = []; for (const [q, f] of loop) { const P = f ? q.poly : [...q.poly].reverse(); for (let k = 0; k < P.length - 1; k++) pts.push(P[k]); }
+      let A = 0, cx = 0, cz = 0; for (let k = 0; k < pts.length; k++) { const [x0, z0] = pts[k], [x1, z1] = pts[(k + 1) % pts.length], cr = x0 * z1 - x1 * z0; A += cr; cx += (x0 + x1) * cr; cz += (z0 + z1) * cr; }
+      A /= 2; faces.push({ loop, pts, area: A, cx: A ? cx / (6 * A) : 0, cz: A ? cz / (6 * A) : 0 }); } }
+    let pos = 0; for (const f of faces) if (f.area > 0) pos++; const sg = pos * 2 >= faces.length ? 1 : -1;
+    return faces.filter(f => f.area * sg > 1);
+  },
+  // große Blöcke organisch zerteilen: Schnitt quer zur Längsachse, leicht schräg und versetzt
+  subdivide(target, keep = []) {
+    for (let it = 0; it < 10; it++) { let cuts = 0;
+      for (const f of this.faces()) { if (f.loop.some(([s]) => !s.alive)) continue; const P = f.pts, A = Math.abs(f.area); if (A < 1500 || A > 3.5e6) continue;
+        if (keep.some(k => pip(k.x, k.z, P))) continue; const T = target(f); if (!T) continue;
+        let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { const dx = x - f.cx, dz = z - f.cz; sxx += dx * dx; szz += dz * dz; sxz += dx * dz; }
+        const th = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(th), uz = Math.sin(th); let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9;
+        for (const [x, z] of P) { const du = (x - f.cx) * ux + (z - f.cz) * uz, dv = -(x - f.cx) * uz + (z - f.cz) * ux; u0 = Math.min(u0, du); u1 = Math.max(u1, du); v0 = Math.min(v0, dv); v1 = Math.max(v1, dv); }
+        if (Math.max(u1 - u0, v1 - v0) < T.max * 1.25) continue;
+        const long = u1 - u0 >= v1 - v0;
+        for (let tr = 0; tr < 5; tr++) { const t = (long ? (u0 + u1) / 2 : (v0 + v1) / 2) + sr(-0.22, 0.22) * (long ? u1 - u0 : v1 - v0);
+        const ox = f.cx + (long ? ux * t : -uz * t), oz = f.cz + (long ? uz * t : ux * t), a = th + (long ? Math.PI / 2 : 0) + sr(-T.ang, T.ang) * (tr ? 1.6 : 1), dx = Math.cos(a), dz = Math.sin(a);
+        let lm = -1e9, lp = 1e9; for (let k = 0; k < P.length; k++) { const [ax, az] = P[k], [bx, bz] = P[(k + 1) % P.length], ex = bx - ax, ez = bz - az, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) continue;
+          const lam = ((ax - ox) * ez - (az - oz) * ex) / den, mu = ((ax - ox) * dz - (az - oz) * dx) / den; if (mu < 0 || mu > 1) continue; if (lam < 0) lm = Math.max(lm, lam); else lp = Math.min(lp, lam); }
+        if (lm < -1e8 || lp > 1e8 || lp - lm < 30 || lp - lm > 900) continue;
+        const p1 = [ox + dx * lm, oz + dz * lm], p2 = [ox + dx * lp, oz + dz * lp]; let ok = true;
+        for (let q = 1; q < 24 && ok; q++) { const x = lerp(p1[0], p2[0], q / 24), z = lerp(p1[1], p2[1], q / 24); if (islandE(x, z) < 0.012 || inLake(x, z, 8) || inBase(x, z, 20)) ok = false; } if (!ok) continue;
+        const n1 = this.attach(p1[0], p1[1], 5), n2 = this.attach(p2[0], p2[1], 5); if (!n1 || !n2 || n1 === n2) continue;
+        this.link(n1, n2, 'street', sr(-1, 1) * T.bend, T.f); cuts++; break; } }
+      if (!cuts) break; }
+  },
   finalize() { const map = new Map();
     const rn = (n) => { let r = map.get(n); if (!r) { const o = {}; for (const k of ['ring', 'collins', 'ocean', 'culdesac', 'mountain', 'gate']) if (n[k]) o[k] = n[k]; r = Roads.addNode(n.x, n.z, o); map.set(n, r); } return r; };
-    for (const s of this.segs) if (s.alive) { const e = Roads.addEdge(rn(s.a), rn(s.b), s.type, s.bend); if (e && s.f) Object.assign(e, s.f); }
+    for (const s of this.segs) if (s.alive) { const e = Roads.addEdge(rn(s.a), rn(s.b), s.type, s.bend); if (e && s.f) Object.assign(e, s.f); s.e = e; }
     this.map = map; },
 };
 // Bogen zwischen zwei Knoten auf einem Kreis um C (nach außen gewölbt)
@@ -296,8 +336,8 @@ function gridNet(C, rot, us, vs, o = {}) {
     g[i].push(Net.node(x, z)); } }
   const skip = o.skip || (() => false), T = o.type || 'street';
   for (let i = 0; i < us.length; i++) for (let j = 0; j < vs.length; j++) {
-    if (i < us.length - 1 && !skip(i, j, 'u')) Net.link(g[i][j], g[i + 1][j], T, sr(-1, 1) * (o.bend || 0));
-    if (j < vs.length - 1 && !skip(i, j, 'v')) Net.link(g[i][j], g[i][j + 1], T, sr(-1, 1) * (o.bend || 0)); }
+    if (i < us.length - 1 && !skip(i, j, 'u')) Net.link(g[i][j], g[i + 1][j], T, sr(-1, 1) * (o.bend || 0), (o.fu && o.fu(i, j)) || o.f || null);
+    if (j < vs.length - 1 && !skip(i, j, 'v')) Net.link(g[i][j], g[i][j + 1], T, sr(-1, 1) * (o.bend || 0), (o.fv && o.fv(i, j)) || o.f || null); }
   return g;
 }
 const border = (g) => { const out = []; for (let i = 0; i < g.length; i++) for (let j = 0; j < g[0].length; j++) if (i === 0 || j === 0 || i === g.length - 1 || j === g[0].length - 1) out.push(g[i][j]); return out; };
@@ -310,15 +350,15 @@ function pathOK(a, b, allowDist = null) { const L = Math.hypot(b.x - a.x, b.z - 
 function buildRoadNetwork() {
   // 1) Downtown: unregelmäßiges Raster, Diagonal-Boulevard, Park-Superblock, Bayfront folgt der Küste
   const dtU = cum([84, 98, 74, 106, 88]), dtV = cum([92, 78, 108, 86, 100, 82]);
-  const dt = gridNet(DOWNTOWN, 0.1, dtU, dtV, { warp: 6, seed: 3.3, skip: (i, j, d) => (d === 'u' && j === 2 && (i === 0 || i === 1)) || (d === 'v' && i === 1 && (j === 1 || j === 2)) || (d === 'v' && i === 4 && j === 4) });
+  const dt = gridNet(DOWNTOWN, 0.1, dtU, dtV, { warp: 6, seed: 3.3, fu: (i, j) => (j % 3 === 0 ? null : { hw: 5.4 }), fv: (i, j) => (i === 2 || i === 5 ? null : { hw: 5.8 }), skip: (i, j, d) => (d === 'u' && j === 2 && (i === 0 || i === 1)) || (d === 'v' && i === 1 && (j === 1 || j === 2)) || (d === 'v' && i === 4 && j === 4) });
   for (let k = 0; k < 5; k++) Net.link(dt[k][6 - k], dt[k + 1][5 - k], 'street', 0);
   { const p = dt[1][2]; LOC.cbdPark = V3(p.x, 0, p.z); }
   zoneRect('downtown', DOWNTOWN.x, DOWNTOWN.z, 0.1, 265, 315);
   // 2) Edgewater (Uptown): gedrehtes Raster
-  const up = gridNet(UPTOWN, 0.32, cum([90, 95, 85]), cum([92, 100, 88]), { warp: 10, bend: 6, seed: 4.4 });
+  const up = gridNet(UPTOWN, 0.32, cum([90, 95, 85]), cum([92, 100, 88]), { warp: 10, bend: 6, seed: 4.4, fu: (i, j) => (j === 1 ? null : { hw: 5.2 }) });
   zoneRect('uptown', UPTOWN.x, UPTOWN.z, 0.32, 170, 175);
   // 3) Little Havana (Midtown): schmale, lange Blöcke
-  const mid = gridNet(MIDTOWN, -0.06, cum([56, 58, 54, 57, 55, 56]), cum([118, 122, 115]), { warp: 3, seed: 5.1 });
+  const mid = gridNet(MIDTOWN, -0.06, cum([56, 58, 54, 57, 55, 56]), cum([118, 122, 115]), { warp: 3, seed: 5.1, fv: (i, j) => (i === 3 ? null : { hw: 4.6 }), fu: (i, j) => (j === 1 || j === 2 ? null : { hw: 5.0 }) });
   zoneRect('midtown', MIDTOWN.x, MIDTOWN.z, -0.06, 198, 207);
   // 4) Altstadt: Kreisverkehr, Radialstraßen, zwei Ringe
   const O = OLDTOWN, round = [], inner = [], ring2 = [], exits = [];
@@ -328,7 +368,7 @@ function buildRoadNetwork() {
   for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + 0.42, r = 272; exits.push(Net.node(O.x + Math.cos(a) * r, O.z + Math.sin(a) * r)); }
   for (let k = 0; k < 6; k++) arcLink(round[k], round[(k + 1) % 6], O, 26, 6);
   for (let k = 0; k < 6; k++) Net.link(round[k], inner[2 * k], 'street', sr(-3, 3));
-  for (let k = 0; k < 12; k++) { arcLink(inner[k], inner[(k + 1) % 12], O, 115, 12); Net.link(inner[k], ring2[k], 'street', sr(-4, 4)); arcLink(ring2[k], ring2[(k + 1) % 12], O, 200, 12); }
+  for (let k = 0; k < 12; k++) { arcLink(inner[k], inner[(k + 1) % 12], O, 115, 12, 'street', { hw: 4.6 }); Net.link(inner[k], ring2[k], 'street', sr(-4, 4), k % 2 ? { hw: 4.2 } : null); arcLink(ring2[k], ring2[(k + 1) % 12], O, 200, 12, 'street', { hw: 5.0 }); }
   for (let k = 0; k < 6; k++) Net.link(ring2[2 * k], exits[k], 'street', sr(-6, 6));
   LOC.oldPlaza = V3(O.x, 0, O.z); zoneCirc('oldtown', O.x, O.z, 285);
   // 5) Hafen & Industrie
@@ -373,13 +413,6 @@ function buildRoadNetwork() {
   const hw2 = [gate, ...[[-1060, 250], [-800, 20], [-450, -15], [-150, -5], [258, 100]].map(([x, z]) => Net.node(x, z))];
   for (let i = 0; i < hw2.length - 1; i++) Net.link(hw2[i], hw2[i + 1], 'highway', i === 0 ? 0 : sr(-14, 14));
   Net.link(hw1[0], nearestOf(arcs[2], hw1[0].x, hw1[0].z), 'street', 10);
-  // 11b) Stadtgebiet: lockeres, leicht verzogenes Straßenraster füllt die Lücken zwischen den Vierteln
-  const fr = [], FS = 108, frot = 0.04, fc = Math.cos(frot), fsn = Math.sin(frot), frSet = new Set();
-  for (let i = -8; i <= 8; i++) { const row = []; for (let j = -11; j <= 11; j++) { const lx = i * FS + sr(-14, 14), lz = j * FS * 1.18 + sr(-14, 14), x = 150 + lx * fc - lz * fsn, z = 80 + lx * fsn + lz * fc;
-    let n = null; if (inUrban(x, z) && !distAt(x, z, 48) && !inBase(x, z, 60) && Math.abs(x - 255) > 40) { n = Net.node(x, z); frSet.add(n); } row.push(n); } fr.push(row); }
-  for (let i = 0; i < fr.length; i++) for (let j = 0; j < fr[i].length; j++) { const n = fr[i][j]; if (!n) continue;
-    const r = i + 1 < fr.length ? fr[i + 1][j] : null, d = fr[i][j + 1]; if (r && pathOK(n, r)) Net.link(n, r, 'street', sr(-7, 7)); if (d && pathOK(n, d)) Net.link(n, d, 'street', sr(-7, 7)); }
-  for (const n of frSet) { if (n.segs.length > 3) continue; const t2 = Net.nearestNode(n.x, n.z, 125, m => m !== n && !frSet.has(m)); if (t2 && !n.segs.some(s => s.a === t2 || s.b === t2) && pathOK(n, t2, distAt(t2.x, t2.z, 40))) Net.link(n, t2, 'street', 0); }
   // 12) Küstenstraße rund ums Festland (unterbrochen in den Stadtbezirken)
   const RC = { x: -480, z: -30 }, rp = [];
   for (let k = 0; k < 60; k++) { const th = k / 60 * TAU, cs = Math.cos(th), sn = Math.sin(th); let r = 2350; for (; r > 200; r -= 6) if (mainSD(RC.x + cs * r, RC.z + sn * r) > 0) break;
@@ -427,11 +460,22 @@ function buildRoadNetwork() {
   Net.link(hw2[hw2.length - 1], dt[0][5], 'street', 0);
   // Sumpf: Schotterweg auf dem Damm
   { const sw = Net.node(SWAMP.x + 40, SWAMP.z - 30), t = Net.nearestNode(sw.x, sw.z, 700, n => n !== sw); if (t) Net.link(t, sw, 'service', 30, { dirt: true }); LOC.swamp = V3(sw.x, 0, sw.z); }
+  // 16) Große Blöcke organisch in kleinere teilen (schmale Nebenstraßen, schräge Schnitte, T-Kreuzungen)
+  const zoneNet = (x, z) => { const D = distAt(x, z); return D ? D.k : inUrban(x, z) ? 'urban' : 'none'; };
+  const SUB = { downtown: { max: 135, ang: 0.1, bend: 0, f: { hw: 5.2 } }, uptown: { max: 85, ang: 0.28, bend: 4, f: { hw: 4.8 } }, oldtown: { max: 82, ang: 0.35, bend: 5, f: { hw: 3.8 } }, urban: { max: 100, ang: 0.33, bend: 7, f: { hw: 4.8 } },
+    village: { max: 75, ang: 0.3, bend: 5, f: { hw: 4.0 } }, port: { max: 175, ang: 0.06, bend: 0, f: { hw: 6.0 } }, industrial: { max: 150, ang: 0.1, bend: 0, f: { hw: 6.0 } } };
+  Net.subdivide((f) => { const P = f.pts; let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const cnt = {}; let n = 0; for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { const x = lerp(x0, x1, (i + 0.5) / 6), z = lerp(z0, z1, (j + 0.5) / 6); if (!pip(x, z, P)) continue; n++; const k = zoneNet(x, z); cnt[k] = (cnt[k] || 0) + 1; }
+    if (!n) return null; if ((cnt.urban || 0) / n >= 0.3) return SUB.urban; let best = null, bc = 0; for (const k in cnt) if (cnt[k] > bc) { bc = cnt[k]; best = k; } return SUB[best] || null; },
+    [LOC.cbdPark, { x: DOWNTOWN.x + 30, z: DOWNTOWN.z - 300 }]);
   Net.finalize();
   const R = (n) => Net.map.get(n) || Roads.nearestNode(n.x, n.z), R2 = (g) => g.map(row => row.map(R));
   Roads.groups = { ring: ring.map(R), dt: R2(dt), sb: R2(sb), pt: R2(pt), spiral: spiral.map(R), collins: collins.map(R), ocean: ocean.map(R), alton: alton.map(R), up: R2(up), mid: R2(mid), ind: R2(ind), vg: R2(vg), vg2: R2(vg2), old: [...round, ...inner, ...ring2, ...exits].map(R), kendall: outer.map(R), heights: arcs.flat().map(R), hw1: hw1.map(R), hw2: hw2.map(R) };
   LOC.baseGate = V3(gate.x, 0, gate.z);
   Roads.sampleAll();
+  // Baublöcke (Flächen zwischen Straßen) mit echten Straßenverläufen
+  Roads.blocks = Net.faces().filter(f => f.loop.every(([s]) => s.e)).map(f => { const loop = f.loop.map(([s, fwd]) => [s.e, fwd]), pts = [];
+    for (const [e, fwd] of loop) { const P = fwd ? e.pts : [...e.pts].reverse(); for (let k = 0; k < P.length - 1; k++) pts.push([P[k].x, P[k].z]); } return { loop, pts, area: Math.abs(f.area), cx: f.cx, cz: f.cz }; });
 }
 
 // Gelände unter Straßen einebnen (Höhenprofil der Straße übernehmen)

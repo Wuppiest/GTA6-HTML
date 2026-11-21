@@ -85,7 +85,7 @@ function bTownRow(F, w, d, L, o = {}) {
   PB(F, 0, 0.3 + H, 0, w + 0.1, 0.5, d + 0.1, trim, { mat: 'concrete' });
   const tiled = o.old && srand() < 0.6;
   if (tiled) part(F, G.gable(), 0, 0.8 + H, 0, d + 0.4, sr(1.8, 2.8), w + 0.2, '#ffffff', { mat: 'roof', ry: Math.PI / 2 });
-  else { PB(F, 0, 0.8 + H, d / 2 - 0.15, w + 0.1, 0.8, 0.3, wall, { mat: 'plaster' }); if (srand() < 0.3) acUnit(F, w * 0.2, 0.8 + H, -d * 0.2); }
+  else { flatRoof(F, w, d, 0.8 + H, 0.2); PB(F, 0, 0.8 + H, d / 2 - 0.15, w + 0.1, 0.8, 0.3, wall, { mat: 'plaster' }); if (srand() < 0.3) acUnit(F, w * 0.2, 0.8 + H, -d * 0.2); }
   return { top: 0.8 + H + (tiled ? 2 : 0), flat: !tiled };
 }
 function bVilla(F, w, d, L) { // moderne Villa mit Auskragung, Glasfront, Pool
@@ -184,6 +184,7 @@ let LOT_GAP = 1.5;
 function buildBuildings() {
   lotsAlong((e, p, zone) => {
     if (zone === 'base' || zone === 'swamp' || e.type === 'service' || e.bridge || e.dirt) return 30;
+    if (BLOCK_RULES[zone]) return 15; // dichte Viertel: Blockbebauung (buildBlocks)
     const pk = (ZR[zone] || ZR.rural)(e, p); if (!pk) return 25;
     for (const side of [1, -1]) { if (srand() > pk.prob) continue;
       const extra = pk.fn === bHouse ? 6 : 0, off = e.hw + 3.4 + pk.setback + pk.d / 2; LOT_GAP = pk.gap ?? 1.5;
@@ -208,7 +209,7 @@ const INFILL = {
   urban: { step: 30, pick: () => { const r = srand(); return r < 0.45 ? [sr(14, 20), sr(12, 18), bApartment, { floors: sri(3, 5), shops: false }] : r < 0.75 ? [sr(9, 13), sr(10, 14), bTownRow, { floors: sri(2, 3), shop: false }] : [sr(10, 12), sr(9, 11), bHouse]; } },
 };
 function buildInfill() {
-  for (const D of [...DISTS, { k: 'urban', cx: 150, cz: 80, r: 1090 }]) { const I = INFILL[D.k]; if (!I) continue; const R = D.r || Math.max(D.hu, D.hv);
+  for (const D of DISTS) { const I = INFILL[D.k]; if (!I || BLOCK_RULES[D.k]) continue; const R = D.r || Math.max(D.hu, D.hv);
     for (let gx = -R; gx <= R; gx += I.step) for (let gz = -R; gz <= R; gz += I.step) {
       const x = D.cx + gx + sr(-5, 5), z = D.cz + gz + sr(-5, 5); if ((D.k === 'urban' ? zoneAt(x, z) !== 'urban' : distAt(x, z) !== D) || inPark(x, z)) continue;
       const r = Roads.nearest(x, z, 160); if (!r || r.d < r.e.hw + 12) continue;
@@ -315,4 +316,83 @@ function gasStation(L, [brand, name]) { reserve(L); const F = FR(L.x, L.y, L.z, 
   Signs.quad(F, 0, 4.5, -L.d / 2 + 9.3, 8, 1.1, 0, Signs.cell(name, brand, '#fff')); const sp = LP(F, 0, 0, -L.d / 2 + 5); World.addOBB(sp.x, sp.z, 7.5, 4, L.yaw, L.y + 4.6); BLD.push({ x: sp.x, z: sp.z, w: 15, d: 8, yaw: L.yaw, h: 5 });
   PB(F, L.w / 2 - 2, 0, L.d / 2 - 2, 0.4, 7, 0.4, '#8a8a90', { keep: true }); Signs.quad(F, L.w / 2 - 2, 7, L.d / 2 - 1.7, 3.2, 1.3, 0, Signs.cell(name, brand, '#fff')); Signs.quad(F, L.w / 2 - 2, 5.4, L.d / 2 - 1.7, 3.2, 1.3, 0, Signs.cell('SUPER 3.49', '#111', '#ffd23a'));
   World.lampAnchors.push(LP(F, -4, 4.6, 2), LP(F, 4, 4.6, 2)); PICKUP_SPOTS.push(['ammo', L.front.x, L.front.z]); if (!LOC.gas) { LOC.gas = L.front.clone(); LOC.gas.yaw = L.yaw; }
+}
+
+// ---------- BAUBLÖCKE: lückenlose Randbebauung + Innenhöfe ----------
+const R1 = (a) => a[Math.floor(srand() * a.length)];
+const BLOCK_RULES = {
+  downtown: { w: () => sr(18, 34), wmin: 12, dmin: 14, dmax: 30, walk: 3.4, set: 0.3, gap: 0.3, gap2: () => sr(0.4, 2), corner: 3,
+    pick: (w, d) => { const r = srand(); if (w > 22 && d > 20) return r < 0.3 ? [bGlassTower] : r < 0.52 ? [bTower] : r < 0.64 ? [bSteppedTower] : r < 0.84 ? [bOffice, { floors: sri(8, 16) }] : [bApartment, { floors: sri(6, 12) }];
+      return r < 0.45 ? [bOffice, { floors: sri(5, 10) }] : r < 0.8 ? [bApartment, { floors: sri(5, 9) }] : [bTownRow, { floors: sri(4, 6) }]; },
+    inner: () => srand() < 0.35 ? ['park'] : srand() < 0.6 ? [sr(18, 26), sr(18, 26), R1([bTower, bOffice, bGlassTower]), { floors: sri(8, 14) }] : [sr(22, 30), sr(20, 28), bParking] },
+  uptown: { w: () => sr(15, 28), wmin: 10, dmin: 12, dmax: 24, walk: 3.4, set: 0.8, gap: 0.5, gap2: () => sr(1, 4), corner: 3,
+    pick: (w, d) => { const r = srand(); return r < 0.55 ? [bApartment, { floors: sri(5, 10) }] : r < 0.75 ? [bOffice, { floors: sri(5, 9) }] : r < 0.85 && w > 20 ? [bTower] : r < 0.92 ? [bShops] : [bTownRow, { floors: sri(3, 5) }]; },
+    inner: () => srand() < 0.45 ? ['park'] : srand() < 0.6 ? ['lot'] : [sr(16, 22), sr(14, 20), bApartment, { floors: sri(4, 7), shops: false }] },
+  midtown: { w: () => sr(8, 15), wmin: 6, dmin: 10, dmax: 22, walk: 3.2, set: 0.2, gap: 0.1, gap2: () => sr(0, 0.6), corner: 2.5,
+    pick: (w, d) => w > 13 && srand() < 0.5 ? [bApartment, { floors: sri(3, 5) }] : srand() < 0.12 ? [bShops] : [bTownRow, { floors: sri(2, 4) }],
+    inner: () => srand() < 0.5 ? ['park'] : srand() < 0.5 ? ['lot'] : [sr(9, 13), sr(9, 12), bTownRow, { floors: 2, shop: false }] },
+  oldtown: { w: () => sr(6, 11), wmin: 5, dmin: 8, dmax: 16, walk: 2.6, set: 0.1, gap: 0.05, gap2: () => 0.1, corner: 2,
+    pick: () => [bTownRow, { old: true, floors: sri(2, 4) }],
+    inner: () => srand() < 0.55 ? ['park'] : [sr(7, 10), sr(7, 10), bTownRow, { old: true, floors: 2, shop: false }] },
+  urban: { w: () => R1([sr(9, 13), sr(13, 22), sr(16, 26)]), wmin: 7, dmin: 12, dmax: 26, walk: 3.2, set: 0.6, gap: 0.6, gap2: () => sr(0.2, 2.2), corner: 2.5,
+    pick: (w, d) => { const r = srand(); if (w < 12) return [bTownRow, { floors: sri(2, 3) }]; if (w > 20 && r < 0.15) return [bOffice, { floors: sri(3, 6) }];
+      return r < 0.45 ? [bApartment, { floors: sri(3, 6) }] : r < 0.7 ? [bTownRow, { floors: sri(2, 4) }] : r < 0.88 ? [bShops] : [bApartment, { floors: sri(2, 4), shops: false }]; },
+    inner: () => { const r = srand(); return r < 0.2 ? ['park'] : r < 0.42 ? ['lot'] : [sr(12, 20), sr(12, 18), R1([bApartment, bTownRow, bApartment, bOffice]), { floors: sri(2, 5), shops: false, shop: false }]; } },
+  strip: { w: () => sr(16, 28), wmin: 10, dmin: 12, dmax: 26, walk: 3.4, set: 1.0, gap: 0.8, gap2: () => sr(1, 4), corner: 3,
+    pick: (w, d, L) => { const u = L.x - beachCX(L.z), r = srand(); if (u > 50) return r < 0.78 ? [bHotel] : [bApartment, { floors: sri(4, 8) }]; if (u < -55) return w > 14 && r < 0.65 ? [bVilla] : [bApartment, { floors: sri(3, 5) }]; return r < 0.45 ? [bApartment, { floors: sri(3, 6) }] : r < 0.75 ? [bShops] : [bHotel]; },
+    inner: () => srand() < 0.5 ? ['park'] : srand() < 0.5 ? ['lot'] : [sr(14, 20), sr(12, 18), bApartment, { floors: sri(3, 6), shops: false }] },
+  village: { w: () => sr(8, 13), wmin: 7, dmin: 8, dmax: 13, walk: 2.6, set: 1.5, gap: 0.8, gap2: () => sr(1, 5), corner: 3,
+    pick: () => srand() < 0.3 ? [bShops] : [bTownRow, { floors: sri(1, 2) }], inner: () => ['park'] },
+  port: { w: () => sr(26, 48), wmin: 20, dmin: 18, dmax: 36, walk: 2.4, set: 3, gap: 4, gap2: () => sr(5, 12), corner: 4,
+    pick: () => [srand() < 0.7 ? bWarehouse : bFactory], inner: () => srand() < 0.6 ? ['yard'] : [sr(26, 40), sr(20, 28), bWarehouse] },
+  industrial: { w: () => sr(24, 44), wmin: 18, dmin: 18, dmax: 34, walk: 2.4, set: 4, gap: 3, gap2: () => sr(4, 12), corner: 4,
+    pick: () => [srand() < 0.55 ? bFactory : bWarehouse], inner: () => srand() < 0.5 ? ['yard'] : [sr(24, 36), sr(20, 30), R1([bFactory, bWarehouse])] },
+};
+// Hauptachsen eines Polygons (für Ausrichtung von Parks)
+function polyFrame(P, cx, cz) { let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of P) { const dx = x - cx, dz = z - cz; sxx += dx * dx; szz += dz * dz; sxz += dx * dz; }
+  const th = 0.5 * Math.atan2(2 * sxz, sxx - szz), ux = Math.cos(th), uz = Math.sin(th); let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9;
+  for (const [x, z] of P) { const du = (x - cx) * ux + (z - cz) * uz, dv = -(x - cx) * uz + (z - cz) * ux; u0 = Math.min(u0, du); u1 = Math.max(u1, du); v0 = Math.min(v0, dv); v1 = Math.max(v1, dv); }
+  const mu = (u0 + u1) / 2, mv = (v0 + v1) / 2; return { th, x: cx + ux * mu - uz * mv, z: cz + uz * mu + ux * mv, hu: (u1 - u0) / 2, hv: (v1 - v0) / 2 }; }
+// freie Tiefe vom Bauflucht-Punkt ins Blockinnere (bis Blockrand oder nächste Straße)
+function blockDepth(e, p, side, front, poly) { const nx = -p.tz * side, nz = p.tx * side; let d = 0;
+  for (d = 2; d < 150; d += 2.5) { const x = p.x + nx * (front + d), z = p.z + nz * (front + d); if (!pip(x, z, poly)) break; const r = Roads.nearest(x, z, 16); if (r && r.e !== e && r.d < r.e.hw + 3.8) break; }
+  return d - 2.5; }
+function parkingLot(L) { reserve(L); const F = FR(L.x, L.y, L.z, L.yaw); PB(F, 0, -0.9, 0, L.w, 1.02, L.d, '#3a3b40', { mat: 'road' }); const rows = Math.max(1, Math.floor(L.d / 11));
+  for (let r = 0; r < rows; r++) { const z = -L.d / 2 + 5.5 + r * 11; parkLines(F, -L.w / 2 + 2, L.w / 2 - 2, z, 5); for (let x = -L.w / 2 + 3; x < L.w / 2 - 2; x += 2.8) if (srand() < 0.35) propCar(F, x + 1.4, z, srand() < 0.5 ? 0 : Math.PI, spick(PAL.car)); }
+  BLD.push({ x: L.x, z: L.z, w: L.w, d: L.d, yaw: L.yaw, h: 0, lot: true }); }
+function storageYard(L) { reserve(L); const F = FR(L.x, L.y, L.z, L.yaw); PB(F, 0, -0.9, 0, L.w, 1.02, L.d, '#6a6a66', { mat: 'concrete' });
+  for (let x = -L.w / 2 + 3; x < L.w / 2 - 3; x += 3) for (let z = -L.d / 2 + 7; z < L.d / 2 - 6; z += 13) if (srand() < 0.7) { const n = sri(1, 3); for (let s = 0; s < n; s++) container(F, x, 0.1 + s * 2.6, z, 0, spick(['#c0392b', '#2471a3', '#d68910', '#1e8449', '#7d3c98', '#5d6d7e'])); const q = LP(F, x, 0, z); World.addOBB(q.x, q.z, 1.25, 6.1, L.yaw, L.y + n * 2.6); }
+  BLD.push({ x: L.x, z: L.z, w: L.w, d: L.d, yaw: L.yaw, h: 3 }); }
+// exakter Punkt + Richtung auf einer Straße bei Strecke s
+const _ea = V3(); function edgeAt(e, s) { const q = Roads.lanePoint(e, 1, s, 0, _ea); return { x: q.x, y: q.y, z: q.z, tx: q.tx, tz: q.tz }; }
+function buildBlocks() {
+  let parks = 0;
+  for (const B of Roads.blocks || []) {
+    if (B.area < 600 || B.area > 400000) continue; const zone = zoneAt(B.cx, B.cz), R = BLOCK_RULES[zone]; if (!R || inPark(B.cx, B.cz)) continue;
+    // ab und zu ein kleiner Park statt Bebauung
+    if ((zone === 'urban' || zone === 'uptown' || zone === 'midtown' || zone === 'oldtown') && B.area > 2500 && B.area < 22000 && srand() < 0.06 && parks < 14) { const f = polyFrame(B.pts, B.cx, B.cz), hx = f.hu - 13, hz = f.hv - 13;
+      if (hx > 12 && hz > 12 && pip(f.x, f.z, B.pts)) { makePark(f.x, f.z, -f.th, hx, hz, { trees: Math.round(hx * hz / 90), name: spick(['PLAZA', 'PARQUE', 'GARDENS', 'SQUARE']) }); parks++; continue; } }
+    // Randbebauung entlang jeder Blockkante
+    for (const [e, fwd] of B.loop) { if (e.bridge || e.dirt || (e.type === 'highway' && zone !== 'port' && zone !== 'industrial')) continue;
+      const A = Roads.nodes[e.a], Bn = Roads.nodes[e.b], P = e.pts, n = P.length, mid = P[n >> 1]; let side = 0;
+      for (const sd of [1, -1]) { const o = e.hw + 6; if (pip(mid.x - mid.tz * o * sd, mid.z + mid.tx * o * sd, B.pts)) { side = sd; break; } } if (!side) continue;
+      const front = e.hw + R.walk + R.set, sEnd = e.len - Bn.r - R.corner; let s = A.r + R.corner;
+      while (s < sEnd - 4) { let w = Math.min(R.w(), sEnd - s); if (w < R.wmin) break;
+        let p = edgeAt(e, s + w / 2); const avail = blockDepth(e, p, side, front, B.pts); if (avail < R.dmin) { s += 5; continue; }
+        const d = Math.min(avail > R.dmax * 2 + 8 ? sr(R.dmin, R.dmax) : Math.max(R.dmin, avail / 2 - 0.6), avail);
+        // Wand an Wand: leichte Überlappung erlaubt; sonst kleinere Varianten probieren
+        LOT_GAP = -0.9; let L = null;
+        for (const [fw, fd] of [[1, 1], [1, 0.72], [0.65, 1], [0.65, 0.7], [0.45, 0.6]]) { const ww = w * fw, dd = Math.max(R.dmin * 0.8, d * fd); if (ww < R.wmin * 0.8) continue; const pp = edgeAt(e, s + ww / 2);
+          L = lotAt(e, pp, side, front + dd / 2, ww, dd, 1.0); if (L) { w = ww; break; } }
+        LOT_GAP = 1.5;
+        if (L && !inPark(L.x, L.z) && !(zone === 'strip' && L.x - beachCX(L.z) > 92)) { const [fn, opts] = R.pick(w, d, L); placeBuilding(L, fn, opts); s += w + R.gap2(); } else { s += 3; } } }
+    // Blockinneres: Hinterhäuser, Parkplätze, Höfe mit Bäumen
+    if (!R.inner || B.area < 2500) continue; let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const [x, z] of B.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const st = Math.max(13, R.dmax * 0.8);
+    for (let x = x0 + st / 2; x < x1; x += st) for (let z = z0 + st / 2; z < z1; z += st) { const px = x + sr(-3, 3), pz = z + sr(-3, 3); if (!pip(px, pz, B.pts)) continue;
+      const r = Roads.nearest(px, pz, 200); if (!r || r.d < r.e.hw + R.walk + R.dmin + 3) continue; const sd = r.lat >= 0 ? 1 : -1, yaw = Math.atan2(r.p.tz * sd, -r.p.tx * sd), pk = R.inner();
+      if (pk[0] === 'park') { if (!World.query(px - 4, pz - 4, px + 4, pz + 4, _qb).some(b => b.tag !== 'prop' && obbHit(px, pz, 2, 2, 0, b, 0.5))) { TREES.push({ t: srand() < 0.4 ? 'palm' : srand() < 0.6 ? 'tree' : 'bush', x: px, z: pz, s: sr(0.7, 1.1) }); World.addOBB(px, pz, 0.4, 0.4, 0, terrainHeight(px, pz) + 5, -50, 'prop'); } continue; }
+      if (pk[0] === 'lot' || pk[0] === 'yard') { const L = lotFree(px, pz, sr(18, 30), sr(16, 24), yaw, 3); if (L) (pk[0] === 'lot' ? parkingLot : storageYard)(L); continue; }
+      LOT_GAP = 1.2; const L = lotFree(px, pz, pk[0], pk[1], yaw, 3); LOT_GAP = 1.5; if (L) placeBuilding(L, pk[2], pk[3]); }
+  }
 }

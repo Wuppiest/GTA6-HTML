@@ -30,8 +30,8 @@ const G = {
 // ---------- WELT-MATERIALIEN (echte Texturen, PBR) ----------
 // Jeder Schlüssel = ein Material; tile = Kachelgröße der Textur in Metern (UVs werden in Metern erzeugt)
 const WM_DEF = {
-  solid: { rough: 0.8 }, shiny: { rough: 0.25, metal: 0.3 }, metal: { rough: 0.35, metal: 0.8 },
-  plaster: { tex: 'plaster', tile: 3.2, rough: 0.92 }, concrete: { tex: 'concrete', tile: 3.5, rough: 0.9 }, brick: { tex: 'brick', tile: 2.4, rough: 0.9 },
+  solid: { rough: 0.8 }, solidB: { rough: 0.8 }, shiny: { rough: 0.25, metal: 0.3 }, metal: { rough: 0.35, metal: 0.8 },
+  plaster: { tex: 'plaster', tile: 3.2, rough: 0.92 }, concrete: { tex: 'concrete', tile: 3.5, rough: 0.9 }, concreteB: { tex: 'concrete', tile: 3.5, rough: 0.9 }, brick: { tex: 'brick', tile: 2.4, rough: 0.9 },
   roof: { tex: 'roofTile', tile: 2.6, rough: 0.8 }, slate: { tex: 'roofSlate', tile: 2.6, rough: 0.85 }, steel: { tex: 'steel', tile: 3, rough: 0.5, metal: 0.55 },
   walk: { tex: 'walk', tile: 3, rough: 0.9 }, plaza: { tex: 'plaza', tile: 4, rough: 0.85 }, planks: { tex: 'planks', tile: 2.6, rough: 0.8 }, pool: { tex: 'pool', tile: 2, rough: 0.15 },
   road: { tex: 'asphalt', tile: 7, rough: 0.92, offset: -2 }, mark: { rough: 0.6, offset: -4 },
@@ -174,7 +174,8 @@ function part(F, g, x, y, z, sx, sy, sz, color, o) {
   _e2.set(o && o.rx || 0, o && o.ry || 0, o && o.rz || 0, o && o.order || 'XYZ'); _q2.setFromEuler(_e2); _M.compose(_t2.set(x, y, z), _q2, _s2.set(sx, sy, sz)); if (F) _M.premultiply(F);
   // Kleinkram (klein oder dünn wie Masten, Geländer) → Streaming-Detailebene
   let det = o && o.det; if (!det && !(o && o.keep)) { const a = Math.abs(sx), b = Math.abs(sy), c = Math.abs(sz), mx = Math.max(a, b, c), mid = a + b + c - mx - Math.min(a, b, c); det = mx < 1.6 || (mid < 0.42 && g !== UG.quad); }
-  emit(o && o.mat || 'solid', g, _M, color, o && o.emis, sx, sy, sz, o && o.cell || 0, det);
+  let mat = o && o.mat || 'solid'; if (!det && (mat === 'concrete' || mat === 'solid') && Math.max(Math.abs(sx), Math.abs(sy), Math.abs(sz)) > 10) mat += 'B'; // große Baukörper: auch aus der Ferne sichtbar
+  emit(mat, g, _M, color, o && o.emis, sx, sy, sz, o && o.cell || 0, det);
 }
 // Kurzformen (y = Unterkante)
 const PB = (F, x, y, z, w, h, d, c, o) => part(F, G.box(), x, y, z, w, h, d, c, o);
@@ -188,10 +189,10 @@ function seg(x1, y1, z1, x2, y2, z2, w, h, c, o) { const dx = x2 - x1, dz = z2 -
 const FR = (x, y, z, yaw) => new THREE.Matrix4().makeRotationY(yaw).setPosition(x, y, z);
 const FRL = (F, x, y, z, yaw = 0) => F.clone().multiply(new THREE.Matrix4().makeRotationY(yaw).setPosition(x, y, z));
 const LP = (F, x, y, z) => V3(x, y, z).applyMatrix4(F);
-const MATFAR = { win: 700, metal: 520, shiny: 420, carpaint: 360, carglass: 360, pool: 420, planks: 520, mark: 360, walk: 620, plaza: 620, steel: 800, slate: 900, roof: 950, brick: 950, glow: 1000 };
+const MATFAR = { concrete: 640, solid: 600, win: 700, metal: 520, shiny: 420, carpaint: 360, carglass: 360, pool: 420, planks: 520, mark: 360, walk: 620, plaza: 620, steel: 800, slate: 900, roof: 950, brick: 950, glow: 1000 };
 function flushParts() {
   for (const [, a] of ACCS) { if (!a.n) continue; const m = new THREE.Mesh(a.mesh(), WM[a.mat] || WM.solid);
-    m.castShadow = !['glow', 'mark', 'road', 'walk', 'plaza', 'win', 'carglass', 'pool'].includes(a.mat); m.receiveShadow = a.mat !== 'glow'; m.matrixAutoUpdate = false; scene.add(m);
+    m.castShadow = !['glow', 'mark', 'road', 'walk', 'plaza', 'win', 'carglass', 'pool', 'concrete', 'solid', 'metal', 'shiny', 'carpaint'].includes(a.mat); m.receiveShadow = a.mat !== 'glow'; m.matrixAutoUpdate = false; scene.add(m);
     const far = MATFAR[a.mat]; if (far) World.lod.push({ obj: m, x: a.cx, z: a.cz, far }); }
   ACCS.clear();
 }
@@ -256,8 +257,9 @@ function facade(F, w, d, y0, floors, fh, o = {}) {
       for (let i = 0; i < n; i++) { const t = -len / 2 + (i + 0.5) * len / n, x = fx + t * c + 0.04 * s, z = fz - t * s + 0.04 * c;
         if (o.door && f === 0 && ry === 0 && Math.abs(t - o.door) < 1.6) continue;
         PW(F, x, y + wh / 2, z, ww, wh, ry, litCol(), style);
-        if (sill && ry === 0) PB(F, x + 0.04 * s, y - 0.12, z + 0.04 * c, fw ? ww + 0.24 : 0.2, 0.12, fw ? 0.2 : ww + 0.24, '#e8e4dc', { mat: 'concrete', det: true });
-        if (det > 0 && o.lintel && ry === 0) PB(F, x + 0.03 * s, y + wh, z + 0.03 * c, fw ? ww + 0.3 : 0.12, 0.22, fw ? 0.12 : ww + 0.3, o.lintel, { mat: 'concrete', det: true });
+        if (i === 0 && ry === 0 && n > 2) { const span = len - len / n + ww + 0.3; if (sill) PB(F, fx, y - 0.12, fz + 0.08, span, 0.12, 0.2, '#e8e4dc', { mat: 'concrete', det: true }); if (det > 0 && o.lintel) PB(F, fx, y + wh, fz + 0.06, span, 0.2, 0.12, o.lintel, { mat: 'concrete', det: true }); }
+        if (sill && ry === 0 && n <= 2) PB(F, x + 0.04 * s, y - 0.12, z + 0.04 * c, fw ? ww + 0.24 : 0.2, 0.12, fw ? 0.2 : ww + 0.24, '#e8e4dc', { mat: 'concrete', det: true });
+        if (det > 0 && o.lintel && ry === 0 && n <= 2) PB(F, x + 0.03 * s, y + wh, z + 0.03 * c, fw ? ww + 0.3 : 0.12, 0.22, fw ? 0.12 : ww + 0.3, o.lintel, { mat: 'concrete', det: true });
         if (o.shutters && f < 3) { for (const sd of [-1, 1]) PB(F, x + (ww / 2 + 0.25) * sd * c + 0.04 * s, y, z - (ww / 2 + 0.25) * sd * s + 0.04 * c, fw ? 0.42 : 0.06, wh, fw ? 0.06 : 0.42, o.shutters, { det: true }); }
       } }
   }
@@ -266,7 +268,10 @@ function railing(F, x0, z0, x1, z1, y, h, c, posts = 1.2) { const L = Math.hypot
   PB(F, (x0 + x1) / 2, y + h, (z0 + z1) / 2, 0.06, 0.06, L, c, { ry, mat: 'metal' }); PB(F, (x0 + x1) / 2, y + 0.1, (z0 + z1) / 2, 0.02, h - 0.15, L, '#7d8a94', { ry, mat: 'carglass' });
   for (let i = 0; i <= n; i++) { const t = i / n; PB(F, lerp(x0, x1, t), y, lerp(z0, z1, t), 0.05, h, 0.05, c, { mat: 'metal' }); } }
 function acUnit(F, x, y, z, ry = 0) { PB(F, x, y, z, 1.0, 0.7, 0.6, '#c8ccd0', { ry, mat: 'metal' }); PC(F, x, y + 0.71, z, 0.3, 0.02, '#3a3e44', { seg: 10 }); }
-function awning(F, x, y, z, w, c1, c2 = '#ffffff', depth = 1.4) { const n = Math.max(2, Math.round(w / 0.6)); for (let i = 0; i < n; i++) part(F, G.box(), x - w / 2 + (i + 0.5) * w / n, y, z + depth / 2, w / n, 0.06, depth, i % 2 ? c2 : c1, { rx: 0.35 }); PB(F, x, y - 0.25, z + depth * 0.95, w, 0.3, 0.04, c1, { rx: 0 }); }
+function awning(F, x, y, z, w, c1, c2 = '#ffffff', depth = 1.4) { const n = Math.max(2, Math.round(w / 1.1)); for (let i = 0; i < n; i++) part(F, G.box(), x - w / 2 + (i + 0.5) * w / n, y, z + depth / 2, w / n, 0.06, depth, i % 2 ? c2 : c1, { rx: 0.35 }); PB(F, x, y - 0.25, z + depth * 0.95, w, 0.3, 0.04, c1, { rx: 0 }); }
+// Flachdach: graue Dachhaut, Rand bleibt als Gesims sichtbar
+const ROOFS = ['#8e8c88', '#a5a29b', '#7a7976', '#b9b5ac', '#6b6c6e', '#c9c6bf', '#958d82', '#a09a90'];
+function flatRoof(F, w, d, y, inset = 0.35) { PB(F, 0, y - 0.04, 0, w - inset * 2, 0.08, d - inset * 2, spick(ROOFS), { mat: 'concrete', keep: true }); }
 function roofStuff(F, w, d, y, n = 2) { // Technik auf Flachdächern
   for (let i = 0; i < n; i++) acUnit(F, -w * 0.3 + i * 1.5, y, d * 0.15);
   if (Q().detail > 0) { PB(F, w * 0.25, y, -d * 0.2, 2.6, 2.4, 2.4, '#b8b4ac', { mat: 'concrete' }); PB(F, w * 0.25, y + 1.1, -d * 0.2 + 1.21, 0.9, 1.9, 0.06, '#5a5e64', { mat: 'metal' });
@@ -311,7 +316,7 @@ function bApartment(F, w, d, L, o = {}) {
   facade(F, w, d, 0.2, 1, 4.2, { only: [Math.PI, Math.PI / 2, -Math.PI / 2], sp: 4, ww: 1.2 });
   if (det > 0 && srand() < 0.7) for (let f = 1; f < floors; f++) for (let x = -w / 2 + 3.2; x < w / 2 - 1.5; x += 6.4) { const y = 4.2 + (f - 1) * fh; PB(F, x, y, d / 2 + 0.7, 2.6, 0.15, 1.4, '#e8e4dc', { mat: 'concrete' }); railing(F, x - 1.3, d / 2 + 1.38, x + 1.3, d / 2 + 1.38, y + 0.15, 0.9, '#e8e8e8', 0.3); }
   for (let f = 1; f < floors; f++) PB(F, 0, 4.2 + (f - 1) * fh - 0.15, 0, w + 0.12, 0.18, d + 0.12, '#f4f0e8', { mat: 'concrete' });
-  PB(F, 0, 0.2 + H, 0, w + 0.35, 0.6, d + 0.35, accent, { mat: 'plaster' }); PB(F, 0, 4.0, 0, w + 0.25, 0.3, d + 0.25, '#f4f0e8', { mat: 'concrete' });
+  PB(F, 0, 0.2 + H, 0, w + 0.35, 0.6, d + 0.35, accent, { mat: 'plaster' }); flatRoof(F, w, d, 0.8 + H); PB(F, 0, 4.0, 0, w + 0.25, 0.3, d + 0.25, '#f4f0e8', { mat: 'concrete' });
   roofStuff(F, w, d, 0.8 + H, 2);
   if (srand() < 0.4) for (let f = 1; f < floors; f++) acUnit(F, w / 2 + 0.3, 4.6 + (f - 1) * fh, sri(-1, 1) * 2, Math.PI / 2);
   return { top: 0.8 + H, flat: true };
@@ -324,7 +329,7 @@ function bHotel(F, w, d, L) {
   facade(F, w - 2 * r, d, 4.8, floors - 1, fh, { only: [0], sp: 2.8, ww: 1.6, wh: 1.7 });
   facade(F, w, d - r, 4.8, floors - 1, fh, { only: [Math.PI, Math.PI / 2, -Math.PI / 2], sp: 3.2, ww: 1.3, wh: 1.6 });
   for (let f = 1; f < floors; f++) { const y = 4.6 + (f - 1) * fh + 2.25; PB(F, 0, y, d / 2 + 0.3, w - 2 * r, 0.12, 0.7, '#ffffff', { mat: 'concrete' }); for (const sx of [-1, 1]) PC(F, sx * (w / 2 - r), y, d / 2 - r, r + 0.35, 0.12, '#ffffff', { seg: 20, mat: 'concrete' }); }
-  PB(F, 0, 0.2 + H, -r / 2, w + 0.3, 0.9, d - r + 0.3, acc, { mat: 'plaster' }); PB(F, 0, 0.2 + H, d / 2 - r / 2, w - 2 * r, 0.9, r + 0.3, acc, { mat: 'plaster' });
+  PB(F, 0, 0.2 + H, -r / 2, w + 0.3, 0.9, d - r + 0.3, acc, { mat: 'plaster' }); PB(F, 0, 0.2 + H, d / 2 - r / 2, w - 2 * r, 0.9, r + 0.3, acc, { mat: 'plaster' }); flatRoof(FRL(F, 0, 0, -r / 2), w, d - r, 1.1 + H);
   PG(F, 0, 0.6 + H, d / 2 + 0.2, w - 2 * r, 0.14, 0.08, nc); for (const sx of [-1, 1]) PG(F, sx * (w / 2 + 0.12), 0.6 + H, -r / 2, 0.08, 0.14, d - r, nc);
   PB(F, 0, 4.6, d / 2 + 0.3, 1.0, H - 1, 1.2, acc, { mat: 'plaster' }); PB(F, 0, H + 1.1, d / 2 - 0.2, 1.4, 4, 1.4, acc, { mat: 'plaster' });
   signF(F, spick(['FLAMINGO', 'MIRAGE', 'SOLARA', 'AZUL', 'CORAL', 'LAGUNA', 'PARADISO', 'BREEZE', 'NEPTUNE', 'CABANA', 'DELMAR', 'MARLIN']), nc, 0, 4.8 + (H - 4.6) * 0.5, d / 2 + 0.95, 1.6, Math.min((H - 4.6) * 0.85, 18), true);
@@ -361,7 +366,7 @@ function bShops(F, w, d, L) {
   for (let i = 0; i < n; i++) { const x = -w / 2 + (i + 0.5) * w / n, sw = w / n - 1, sh = spick(SHOPS);
     PW(F, x + 0.5, 2.0, d / 2 + 0.06, sw - 1.3, 2.8, 0, 0xfff0c8, 2); PB(F, x - sw / 2 + 0.6, 0.2, d / 2 + 0.05, 1.0, 2.5, 0.1, '#ffffff', { mat: 'win', emis: 0xfff0c8, cell: 2 }); PG(F, x - sw / 2 + 0.6, 2.75, d / 2 + 0.12, 0.2, 0.2, 0.08, '#ffd9a0');
     awning(F, x, 3.7, d / 2, sw + 0.2, sh[1] === '#fff' ? sh[2] : sh[1]); Signs.quad(F, x, 4.25, d / 2 + 0.1, sw * 0.85, 0.85, 0, Signs.cell(sh[0], sh[1], sh[2])); PB(F, x + sw / 2, 0.2, d / 2 - 0.1, 0.3, H, 0.3, '#e8e0d4', { mat: 'concrete' }); }
-  roofStuff(F, w, d, 0.2 + H, n);
+  flatRoof(F, w, d, 0.2 + H, 0.15); roofStuff(F, w, d, 0.2 + H, n);
   return { top: 0.2 + H, flat: true };
 }
 function bWarehouse(F, w, d, L) {
@@ -614,7 +619,7 @@ function buildCoast() {
     for (const [lx, lz] of [[-6, -4], [6, -4], [-6, 4], [6, 4]]) { PB(F, lx, 0, lz, 1.2, 34, 1.2, yc); World.addOBB(pc.x + dx + lx, qz - 8 + lz, 0.7, 0.7, 0, 40); }
     for (const yy of [10, 20, 30]) { PB(F, 0, yy, -4, 13, 0.5, 0.5, yc); PB(F, 0, yy, 4, 13, 0.5, 0.5, yc); PB(F, -6, yy, 0, 0.5, 0.5, 9, yc); PB(F, 6, yy, 0, 0.5, 0.5, 9, yc); }
     PB(F, 0, 34, 15, 3, 3, 80, '#d23a2a'); PB(F, 0, 37, 0, 9, 6, 9, yc); PW(F, 0, 39, 4.53, 6, 2, 0, 0x9fd0ff); PB(F, 0, 31, 40, 2, 3, 2, '#333'); for (const sx of [-0.7, 0.7]) PB(F, sx, 18, 40, 0.06, 13, 0.06, '#222'); PG(F, 0, 40.2, 0, 0.4, 0.4, 0.4, '#ff2020'); }
-  LOC.portYard = V3(PORT.x + 20, 3, PORT.z + 30); const yard = LOC.portYard;
+  LOC.portYard = V3(PORT.x + 20, 3, PORT.z + 30); const yard = LOC.portYard; World.addOBB(yard.x, yard.z, 40, 36, 0, -100, -50, 'reserve');
   for (let i = -4; i <= 4; i++) for (let j = -2; j <= 2; j++) { if (Math.abs(i) <= 1 && Math.abs(j) <= 1) continue; const x = yard.x + i * 8, z = yard.z + j * 15; if (terrainHeight(x, z) < 1.5 || Roads.nearest(x, z, 14)) continue;
     const n = sri(1, 4); for (let s = 0; s < n; s++) container(F0, x, 3 + s * 2.6, z, 0, spick(['#c0392b', '#2471a3', '#d68910', '#1e8449', '#7d3c98', '#5d6d7e', '#ca6f1e'])); World.addOBB(x, z, 1.25, 6.1, 0, 3 + n * 2.6); BLD.push({ x, z, w: 2.5, d: 12, yaw: 0 }); }
   { const sx = pc.x, sz = qz + 30, F = FR(sx, 0, sz, Math.PI / 2); PB(F, 0, -6, 0, 24, 14, 150, '#1f3a5a'); part(F, G.frus(0.2, 0.5, 0.25), 0, -6, 81.5, 24, 14, 13, '#1f3a5a', { rx: 0 }); PB(F, 0, 7.6, 0, 24.2, 0.6, 162, '#a83228'); PB(F, 0, 8.2, 0, 23, 0.3, 160, '#5a5e64');
@@ -662,7 +667,7 @@ function buildRoadMeshes() {
       for (const sd of [1, -1]) { const o0 = (hw) * sd, o1 = (hw + 3.2) * sd; ribbon('walk', e, Math.min(o0, o1), Math.max(o0, o1), 0.2, ROADC.walk, kA, kB); ribbon('concrete', e, Math.min(o0, o0 + 0.3 * sd), Math.max(o0, o0 + 0.3 * sd), 0.205, ROADC.curb, kA, kB); wall('concrete', e, o0, 0.0, 0.2, ROADC.curb, kA, kB); wall('concrete', e, o1, -0.8, 0.2, ROADC.walk2, kA, kB); } }
     else if (e.type === 'highway' && zone !== 'strip' && kB > kA) for (const sd of [1, -1]) { wall('metal', e, (hw + 1.22) * sd, 0.45, 0.75, C3('#c4c8cc'), kA, kB); wall('metal', e, (hw + 1.18) * sd, 0.45, 0.75, C3('#c4c8cc'), kA, kB, true); for (let k = kA; k < kB; k += 1) { const p = P[k]; PB(null, p.x - p.tz * (hw + 1.25) * sd, p.y, p.z + p.tx * (hw + 1.25) * sd, 0.12, 0.7, 0.12, '#8a8e92', { mat: 'metal' }); } }
     // Zebrastreifen & Haltelinien an großen Kreuzungen
-    if (e.type === 'street') for (const [node, end] of [[A, 0], [B, 1]]) { if (node.edges.length < 3) continue;
+    if (e.type === 'street' && e.hw >= 4.5) for (const [node, end] of [[A, 0], [B, 1]]) { if (node.edges.length < 3) continue;
       const k = end === 0 ? Math.min(n - 1, Math.ceil((node.r + 2) / 4)) : Math.max(0, n - 1 - Math.ceil((node.r + 2) / 4)), p = P[k], F = FR(p.x, p.y + 0.08, p.z, Math.atan2(p.tx, p.tz));
       for (let s = -hw + 0.9; s <= hw - 0.9; s += 1.2) PB(F, s, 0, 0, 0.6, 0.02, 2.8, '#ececec', { mat: 'mark', keep: true }); PB(F, (end === 0 ? -1 : 1) * hw / 2, 0, (end === 0 ? 2.2 : -2.2), hw - 0.6, 0.02, 0.4, '#ececec', { mat: 'mark' }); }
   }
@@ -725,7 +730,7 @@ function buildStreetFurniture() {
     // Ampeln & Straßenschilder an Kreuzungen
     for (const [node, end] of [[A, 0], [B, 1]]) { if (node.edges.length < 3) continue; const k = end === 0 ? Math.min(n - 1, Math.ceil((node.r + 3.5) / 4)) : Math.max(0, n - 1 - Math.ceil((node.r + 3.5) / 4)), p = P[k], dir = end === 0 ? -1 : 1;
       const tx = p.tx * -dir, tz = p.tz * -dir, sx = p.x - tz * (e.hw + 1.2), sz = p.z + tx * (e.hw + 1.2);
-      if (urban && zone !== 'suburb' && zone !== 'heights') trafficLight(sx, p.y + 0.2, sz, Math.atan2(-tz, tx), e.hw, node.id, e.id); else if (end === 0) streetSign(sx, p.y + 0.2, sz, Math.atan2(tx, tz), name); }
+      if (urban && zone !== 'suburb' && zone !== 'heights' && e.hw >= 4.5 && node.edges.some(i => Roads.edges[i] !== e && Roads.edges[i].hw >= 4.5)) trafficLight(sx, p.y + 0.2, sz, Math.atan2(-tz, tx), e.hw, node.id, e.id); else if (end === 0 || e.hw < 4.5) streetSign(sx, p.y + 0.2, sz, Math.atan2(tx, tz), name); }
   }
 }
 
@@ -830,7 +835,7 @@ function buildTerrain() {
     const e = islandE(x, z), zn = zoneAt(x, z), fo = fbm(x / 160 + 30, z / 160 - 10, 3), nz = hash2(Math.floor(x / 9), Math.floor(z / 9));
     let g = 1, sa = 0, ro = 0, pv = 0, fr = 0;
     if (y < 2.6 && e < 0.1) { sa = clamp((2.6 - y) / 1.2, 0, 1) + (y < 0.4 ? 1 : 0); }
-    if (zn === 'downtown' || zn === 'port' || zn === 'base' || zn === 'industrial' || zn === 'uptown') pv = 1.2; else if (zn === 'midtown' || zn === 'oldtown') pv = 0.9; else if (zn === 'urban') pv = 0.45 + fbm(x / 90, z / 90, 2) * 0.5;
+    if (zn === 'downtown' || zn === 'port' || zn === 'base' || zn === 'industrial' || zn === 'uptown') pv = 1.2; else if (zn === 'midtown' || zn === 'oldtown') pv = 0.9; else if (zn === 'urban') pv = 0.68 + fbm(x / 90, z / 90, 2) * 0.45;
     const park = pv > 0 && PARKS.length && inPark(x, z); if (park) pv = 0;
     const fld = FIELDS.length ? fieldAt(x, z) : null; if (fld && fld.f.type === 5) sa = 1.2;
     if (fo > 0.12 && pv === 0) fr = clamp((fo - 0.12) * 5, 0, 1.2);
@@ -867,17 +872,20 @@ function buildMinimapImage() {
     id.data[i] = r; id.data[i + 1] = gg; id.data[i + 2] = b; id.data[i + 3] = 255; }
   g.putImageData(id, 0, 0); const s = MAP.s, T = (x) => (x + WS) * s;
   g.fillStyle = 'rgba(120,124,130,.9)'; g.fillRect(T(BASE.x - BASE.hx), T(BASE.z - BASE.hz), BASE.hx * 2 * s, BASE.hz * 2 * s); g.fillStyle = '#3a3a3e'; g.fillRect(T(BASE.x - 93), T(BASE.z - 420), 46 * s, 840 * s);
-  g.fillStyle = 'rgba(150,150,140,.5)'; for (const D of DISTS) { if (!['downtown', 'uptown', 'midtown', 'oldtown', 'port', 'industrial'].includes(D.k)) continue; g.save(); g.translate(T(D.cx), T(D.cz)); if (D.r) { g.beginPath(); g.arc(0, 0, D.r * s, 0, 7); g.fill(); } else { g.rotate(D.rot); g.fillRect(-D.hu * s, -D.hv * s, D.hu * 2 * s, D.hv * 2 * s); } g.restore(); }
+  // Stadtblöcke grau (Asphalt/Höfe), Parks grün darüber
+  const DENSE = new Set(['downtown', 'uptown', 'midtown', 'oldtown', 'urban', 'port', 'industrial', 'strip', 'village']);
+  for (const B of Roads.blocks || []) { if (B.area > 400000) continue; const zn = zoneAt(B.cx, B.cz); if (!DENSE.has(zn)) continue; g.fillStyle = zn === 'port' || zn === 'industrial' ? 'rgba(128,128,122,.85)' : zn === 'strip' || zn === 'village' ? 'rgba(150,150,138,.6)' : 'rgba(146,146,140,.85)';
+    g.beginPath(); B.pts.forEach(([x, z], k) => k ? g.lineTo(T(x), T(z)) : g.moveTo(T(x), T(z))); g.closePath(); g.fill(); }
   g.fillStyle = 'rgba(90,150,80,.8)'; for (const p of PARKS) { g.save(); g.translate(T(p.x), T(p.z)); g.rotate(-Math.atan2(p.s, p.c)); g.fillRect(-p.hx * s, -p.hz * s, p.hx * 2 * s, p.hz * 2 * s); g.restore(); }
   for (const f of FIELDS) { g.save(); g.translate(T(f.x), T(f.z)); g.rotate(-Math.atan2(f.s, f.c)); g.fillStyle = ['rgba(200,180,90,.6)', 'rgba(150,190,90,.6)', 'rgba(170,130,90,.6)', 'rgba(180,210,100,.6)', 'rgba(120,200,90,.75)', 'rgba(230,215,160,.9)'][f.type]; g.fillRect(-f.hx * s, -f.hz * s, f.hx * 2 * s, f.hz * 2 * s); g.restore(); }
-  g.fillStyle = '#4a5058'; for (const b of BLD) { g.save(); g.translate(T(b.x), T(b.z)); g.rotate(-b.yaw); g.fillRect(-b.w / 2 * s, -b.d / 2 * s, b.w * s, b.d * s); g.restore(); }
+  for (const b of BLD) { g.save(); g.translate(T(b.x), T(b.z)); g.rotate(-b.yaw); const h = b.h || 6; g.fillStyle = b.lot ? '#6e7276' : h > 40 ? '#3a3f48' : h > 14 ? '#4c525a' : '#5c5a58'; g.fillRect(-b.w / 2 * s, -b.d / 2 * s, b.w * s, b.d * s); if (!b.lot && b.w * s > 3) { g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; g.strokeRect(-b.w / 2 * s, -b.d / 2 * s, b.w * s, b.d * s); } g.restore(); }
   g.lineCap = 'round'; g.lineJoin = 'round';
   for (const pass of [0, 1]) for (const e of Roads.edges) { g.strokeStyle = pass ? (e.type === 'highway' ? '#f0d890' : '#d8dce0') : '#22262a'; g.lineWidth = (e.hw * 2 + (pass ? 0 : 3)) * s; g.beginPath(); e.pts.forEach((p, k) => k ? g.lineTo(T(p.x), T(p.z)) : g.moveTo(T(p.x), T(p.z))); g.stroke(); }
   MAP.canvas = c;
 }
 function buildWorld() {
   makeWorldMaterials(); Signs.init();
-  buildRoadNetwork(); carveRoads(); buildParks(); buildSpecials(); buildBase(); buildCoast(); buildBuildings(); buildInfill(); buildRural(); buildRoadMeshes(); buildStreetFurniture(); Signals.build(); buildStunts(); buildVegetation(); buildTerrain();
+  buildRoadNetwork(); carveRoads(); buildParks(); buildSpecials(); buildBase(); buildCoast(); buildBlocks(); buildBuildings(); buildInfill(); buildRural(); buildRoadMeshes(); buildStreetFurniture(); Signals.build(); buildStunts(); buildVegetation(); buildTerrain();
   flushParts(); Signs.flush(); flushNeon(); buildMinimapImage();
   console.log('Welt-Vertices:', VERTS, 'Gebäude:', BLD.length);
   LOC.kai = LOC.safehouse ? LOC.safehouse.clone() : V3(SUBURB.x, 5, SUBURB.z); LOC.elena = LOC.beach.clone();
