@@ -829,7 +829,7 @@ function buildVegetation() {
   const NOVEG = new Set(['base', 'downtown', 'port', 'uptown', 'industrial', 'midtown', 'oldtown']);
   for (let k = 0; k < 24000 * dens; k++) {
     const x = sr(-1950, 1950), z = sr(-1950, 1950), h = terrainHeight(x, z); if (h < (Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r ? 0.35 : 1.5)) continue; const zone = zoneAt(x, z); if (NOVEG.has(zone) || fieldAt(x, z) || inPark(x, z) || nearRamp(x, z)) continue;
-    const r = Roads.nearest(x, z, 24); if (r && r.d < r.e.hw + 5) continue; if (World.query(x - 3, z - 3, x + 3, z + 3, _qb).length) continue;
+    const r = Roads.nearest(x, z, 24); if (r && r.d < r.e.hw + 5) continue; if (World.query(x - 3, z - 3, x + 3, z + 3, _qb).length || groundBlock(x, z)) continue;
     const e = islandE(x, z), fo = fbm(x / 160 + 30, z / 160 - 10, 3); let t;
     if (zone === 'swamp') t = srand() < 0.55 ? 'tree' : srand() < 0.8 ? 'bush' : 'palm';
     else if (h > 40) t = srand() < 0.75 ? 'pine' : 'rock'; else if (e < 0.12 || zone === 'strip') t = srand() < 0.85 ? 'palm' : 'bush'; else if (zone === 'suburb' || zone === 'heights' || zone === 'village') t = srand() < 0.4 ? 'palm' : srand() < 0.55 ? 'tree' : srand() < 0.7 ? 'bush' : 'flower';
@@ -840,7 +840,7 @@ function buildVegetation() {
   for (let k = 0; k < 40000 * dens; k++) { // dichte Wälder in Waldflächen
     const x = sr(-1950, 1950), z = sr(-1950, 1950), fo = fbm(x / 160 + 30, z / 160 - 10, 3), h = terrainHeight(x, z), sw = Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r * 0.95, mt = h > 45;
     if (fo < (sw ? -0.2 : mt ? -0.12 : 0.03)) continue; if (h < (sw ? 0.3 : 2) || h > 175) continue;
-    const zone = zoneAt(x, z); if (zone !== 'rural' && zone !== 'mountain' && zone !== 'swamp') continue; if (fieldAt(x, z) || nearRamp(x, z)) continue; const r = Roads.nearest(x, z, 20); if (r && r.d < r.e.hw + 6) continue; if (World.query(x - 4, z - 4, x + 4, z + 4, _qb).length) continue;
+    const zone = zoneAt(x, z); if (zone !== 'rural' && zone !== 'mountain' && zone !== 'swamp') continue; if (fieldAt(x, z) || nearRamp(x, z) || groundBlock(x, z)) continue; const r = Roads.nearest(x, z, 20); if (r && r.d < r.e.hw + 6) continue; if (World.query(x - 4, z - 4, x + 4, z + 4, _qb).length) continue;
     const q = srand(); TREES.push({ t: sw ? (q < 0.35 ? 'willow' : q < 0.6 ? 'tree' : 'bush') : mt ? (q < 0.68 ? 'pine' : q < 0.84 ? 'birch' : 'rock') : q < 0.48 ? 'tree' : q < 0.66 ? 'birch' : q < 0.88 ? 'pine' : 'bush', x, z, s: sw ? sr(0.6, 1.0) : sr(0.8, 1.35) }); }
   // Weiden an Seeufern, Seerosen in Sumpf und Seen
   for (const L of LAKES) for (let k = 0; k < 26; k++) { const a = sr(0, TAU), d = L.r * sr(1.12, 1.45), x = L.x + Math.cos(a) * d, z = L.z + Math.sin(a) * d, h = terrainHeight(x, z); if (h < 0.8 || Roads.nearest(x, z, 10)) continue; TREES.push({ t: srand() < 0.6 ? 'willow' : 'tree', x, z, s: sr(0.9, 1.25) }); }
@@ -897,6 +897,7 @@ function terrainMaterial() {
   };
   return m;
 }
+const DIRT_C = new THREE.Color('#9a7656'), GRAVEL_C = new THREE.Color('#b4aa98'), ROCK_C = new THREE.Color('#a39e94');
 function buildTerrain() {
   const cells = [80, 64, 48, 40, 32].find(c => (GN - 1) % c === 0), NC = (GN - 1) / cells, mat = terrainMaterial(); World.terrainChunks = [];
   // Gewichte & Tönung für jeden Gitterpunkt einmal berechnen
@@ -911,11 +912,13 @@ function buildTerrain() {
     const park = pv > 0 && PARKS.length && inPark(x, z); if (park) pv = 0;
     const fld = FIELDS.length ? fieldAt(x, z) : null; if (fld && fld.f.type === 5) sa = 1.2;
     if (fo > 0.12 && pv === 0) fr = clamp((fo - 0.12) * 5, 0, 1.2);
-    ro = clamp((0.86 - ny) * 6, 0, 3) + (y > 110 ? clamp((y - 110) / 40, 0, 1) : 0);
+    const gp = groundAt(x, z); if (gp) { sa = Math.max(sa, gp.dirt * 1.05); pv = Math.max(pv, gp.gravel * 0.75); fr = Math.max(fr, gp.forest); }
+    ro = clamp((0.86 - ny) * 6, 0, 3) + (y > 110 ? clamp((y - 110) / 40, 0, 1) : 0); if (gp) ro = Math.max(ro, gp.rock * 2.2);
     W[k * 5] = g * (1 - Math.min(1, sa + pv)); W[k * 5 + 1] = sa; W[k * 5 + 2] = ro; W[k * 5 + 3] = pv; W[k * 5 + 4] = fr * (1 - Math.min(1, sa));
     c.setRGB(1, 1, 1); { const m = fbm(x / 420 + 7, z / 420 - 3, 2); if (m < 0) c.lerp(dry, clamp(-m * 1.6, 0, 0.55)); else c.multiplyScalar(1 - m * 0.18); } if (fo < -0.2) c.lerp(dry, 0.35); if (y < 0) c.multiplyScalar(clamp(1 + y / 30, 0.45, 1));
     if (fld) { const pal = fc[fld.f.type]; c.copy(Math.sin(fld.lx * (fld.f.type === 4 ? 0.35 : 1.4)) > 0 ? pal[0] : pal[1]); } else if (park) c.setRGB(0.86, 1.0, 0.78);
     if (zn === 'swamp') c.multiply(C3('#a8b088')); else if (zn === 'mountain' || y > 60) c.multiply(C3('#c8ccb0'));
+    if (gp) { if (gp.dirt) c.lerp(DIRT_C, gp.dirt * 0.85); if (gp.gravel) c.lerp(GRAVEL_C, gp.gravel * 0.6); if (gp.rock) c.lerp(ROCK_C, gp.rock * 0.5); }
     c.multiplyScalar(0.92 + nz * 0.14); Ct[k * 3] = c.r; Ct[k * 3 + 1] = c.g; Ct[k * 3 + 2] = c.b; }
   const mkChunk = (ci, cj, step) => { const cn = cells / step, n1 = cn + 1, nv = n1 * n1 + 4 * n1, pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3), sp = new Float32Array(nv * 4), sp2 = new Float32Array(nv), idx = [];
     const put = (v, gi, gj, dy) => { const k = gj * GN + gi; pos[v * 3] = -WS + gi * CELL; pos[v * 3 + 1] = HGT[k] - dy; pos[v * 3 + 2] = -WS + gj * CELL; for (let q = 0; q < 3; q++) { nor[v * 3 + q] = Nrm[k * 3 + q]; col[v * 3 + q] = Ct[k * 3 + q]; } for (let q = 0; q < 4; q++) sp[v * 4 + q] = W[k * 5 + q]; sp2[v] = W[k * 5 + 4]; };
@@ -952,6 +955,7 @@ function buildMinimapImage() {
   for (const f of FIELDS) { g.save(); g.translate(T(f.x), T(f.z)); g.rotate(-Math.atan2(f.s, f.c)); g.fillStyle = ['rgba(200,180,90,.6)', 'rgba(150,190,90,.6)', 'rgba(170,130,90,.6)', 'rgba(180,210,100,.6)', 'rgba(120,200,90,.75)', 'rgba(230,215,160,.9)'][f.type]; g.fillRect(-f.hx * s, -f.hz * s, f.hx * 2 * s, f.hz * 2 * s); g.restore(); }
   // Wälder als dunkle Punkte, danach Zusatzflächen (Flugplatz, Pfade, Steinbruch)
   for (const t of TREES) { if (t.t !== 'pine' && t.t !== 'tree' && t.t !== 'birch' && t.t !== 'willow') continue; g.fillStyle = t.t === 'pine' ? 'rgba(34,70,40,.55)' : 'rgba(50,95,45,.5)'; g.fillRect(T(t.x) - 1.2, T(t.z) - 1.2, 2.4, 2.4); }
+  for (const q of GROUND) { if (q.amt < 0.5 || q.type === 'forest') continue; g.fillStyle = q.type === 'dirt' ? 'rgba(150,118,84,.75)' : q.type === 'gravel' ? 'rgba(170,164,150,.7)' : 'rgba(150,146,138,.85)'; g.beginPath(); g.arc(T(q.x), T(q.z), Math.max(1, q.r * s), 0, 7); g.fill(); }
   for (const f of MAP_PAINT) f(g, T, s);
   for (const b of BLD) { g.save(); g.translate(T(b.x), T(b.z)); g.rotate(-b.yaw); const h = b.h || 6; g.fillStyle = b.lot ? '#6e7276' : h > 40 ? '#3a3f48' : h > 14 ? '#4c525a' : '#5c5a58'; g.fillRect(-b.w / 2 * s, -b.d / 2 * s, b.w * s, b.d * s); if (!b.lot && b.w * s > 3) { g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; g.strokeRect(-b.w / 2 * s, -b.d / 2 * s, b.w * s, b.d * s); } g.restore(); }
   g.lineCap = 'round'; g.lineJoin = 'round';
