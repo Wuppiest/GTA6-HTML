@@ -231,7 +231,7 @@ const Ambient2 = {
 };
 const _actInteract = Act.interact.bind(Act); Act.interact = function () { if (Cable.interact()) return true; return _actInteract(); };
 const _bmInit = BigMap.init.bind(BigMap);
-BigMap.init = function () { _bmInit(); Radial.build(); Ambient2.init(); World.anim.push((dt) => Ambient2.update(dt));
+BigMap.init = function () { _bmInit(); Radial.build(); { const vl = document.createElement('div'); vl.id = 'verLabel'; vl.textContent = 'Version ' + (window.__VER || '?'); vl.style.cssText = 'position:fixed;right:8px;bottom:4px;font:11px Arial,sans-serif;color:rgba(255,255,255,.55);z-index:70;pointer-events:none;text-shadow:0 1px 2px #000'; document.body.appendChild(vl); } Ambient2.init(); World.anim.push((dt) => Ambient2.update(dt));
   if (LOC.base) blip('✈', '#6a7a4a', LOC.base.x, LOC.base.z, 'Militärbasis'); if (LOC.marina) blip('⚓', '#2a8ad8', LOC.marina.x, LOC.marina.z, 'Marina');
   if (LOC.swamp) blip('🐊', '#4a6a2a', LOC.swamp.x, LOC.swamp.z, 'Airboat-Touren'); if (LOC.beach) blip('🏄', '#22b5d8', LOC.beach.x, LOC.beach.z, 'Jetski-Verleih'); if (LOC.quay) blip('🚢', '#5a6a7a', LOC.quay.x, LOC.quay.z, 'Hafen');
   // Touch: Waffen- & Emote-Rad, Kamera, Licht
