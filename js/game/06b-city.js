@@ -204,6 +204,7 @@ const INFILL = {
   port: { step: 44, pick: () => [sr(26, 40), sr(20, 28), bWarehouse] },
   industrial: { step: 44, pick: () => [sr(26, 40), sr(20, 30), srand() < 0.5 ? bFactory : bWarehouse] },
   village: { step: 26, pick: () => [sr(9, 12), sr(9, 11), bHouse] },
+  suburb: { step: 30, pick: () => [sr(11, 13), sr(10, 12), bHouse] },
   urban: { step: 30, pick: () => { const r = srand(); return r < 0.45 ? [sr(14, 20), sr(12, 18), bApartment, { floors: sri(3, 5), shops: false }] : r < 0.75 ? [sr(9, 13), sr(10, 14), bTownRow, { floors: sri(2, 3), shop: false }] : [sr(10, 12), sr(9, 11), bHouse]; } },
 };
 function buildInfill() {
@@ -237,6 +238,8 @@ function buildParks() {
   // Plaza im Kreisverkehr der Altstadt
   { const O = LOC.oldPlaza, y = terrainHeight(O.x, O.z), F = FR(O.x, y, O.z, 0); PC(F, 0, -0.8, 0, 15, 1.0, '#e6d6bc', { seg: 24, mat: 'plaza' }); PC(F, 0, 0.0, 0, 4.4, 0.7, '#f4f0e8', { seg: 18 }); part(F, G.cyl(18), 0, 0.6, 0, 8, 0.12, 8, '#3fc8e8', { mat: 'pool' }); PC(F, 0, 0, 0, 0.5, 4.5, '#e8e0d0', { seg: 10 }); PS(F, 0, 5.2, 0, 0.9, '#c8b890');
     for (let a = 0; a < 6; a++) TREES.push({ t: 'palm', x: O.x + Math.cos(a) * 11, z: O.z + Math.sin(a) * 11, s: 0.9 }); World.addOBB(O.x, O.z, 4.5, 4.5, 0, y + 5); }
+  // Parks in den Vorstädten (Spielplatz, Bäume)
+  for (const P of [SUBURB2, SUBURB]) { const r = Roads.nearest(P.x, P.z, 200); const off = r && r.d < 40 ? 45 : 0; makePark(P.x + off, P.z, 0.2, 30, 26, { trees: 22, name: P === SUBURB2 ? 'KENDALL PARK' : 'PALM PARK' }); }
   // Dominopark in Little Havana
   { const g = Roads.groups.mid, a = g[2][1], b = g[3][2]; if (a && b) makePark((a.x + b.x) / 2, (a.z + b.z) / 2, 0.06, 14, 42, { trees: 14, name: 'PARQUE MAXIMO' }); }
 }

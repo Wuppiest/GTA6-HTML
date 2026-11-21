@@ -174,19 +174,27 @@ class Environment {
     scene.fog = new THREE.Fog(0xcfe2f2, 300, 1600);
     this.initWater(); this.initRain();
   }
+  // Weiche Haufenwolken: Billboards aus weichen Wolkenballen (ein Draw Call)
   initClouds() {
-    const parts = [];
-    for (let i = 0; i < 46; i++) {
-      const cx = sr(-2600, 2600), cz = sr(-2600, 2600), cy = sr(420, 700), n = randi(5, 9), s = sr(40, 90);
-      for (let k = 0; k < n; k++) { const g = new THREE.IcosahedronGeometry(1, 0); g.scale(s * sr(0.6, 1.2), s * sr(0.35, 0.55), s * sr(0.6, 1.1)); g.translate(cx + sr(-1.2, 1.2) * s, cy + sr(-0.2, 0.25) * s, cz + sr(-0.8, 0.8) * s); parts.push(g); }
-    }
-    this.cloudMat = lam({ color: 0xffffff, flatShading: true, emissive: 0x666666, transparent: true, opacity: 0.92, fog: false });
-    this.clouds = new THREE.Mesh(ADD.merge(parts), this.cloudMat); this.clouds.frustumCulled = false; scene.add(this.clouds);
+    const tex = canvasTex(128, 128, (g) => { g.clearRect(0, 0, 128, 128); for (let k = 0; k < 9; k++) { const x = 64 + sr(-26, 26), y = 70 + sr(-18, 14), r = sr(22, 40), gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,0.55)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.25)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); } }, { repeat: false });
+    const pos = [], cor = [], siz = [], shd = [], idx = [];
+    for (let i = 0; i < 52; i++) { const cx = sr(-3000, 3000), cz = sr(-3000, 3000), cy = sr(430, 680), n = randi(7, 13), s = sr(55, 115);
+      for (let k = 0; k < n; k++) { const px = cx + sr(-1.4, 1.4) * s, py = cy + sr(-0.12, 0.35) * s, pz = cz + sr(-0.9, 0.9) * s, ps = s * sr(0.75, 1.35), b = pos.length / 3;
+        for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { pos.push(px, py, pz); cor.push(u, v); siz.push(ps); shd.push((py - cy) / s); }
+        idx.push(b, b + 1, b + 2, b, b + 2, b + 3); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('corner', new THREE.Float32BufferAttribute(cor, 2)); g.setAttribute('psize', new THREE.Float32BufferAttribute(siz, 1)); g.setAttribute('shade', new THREE.Float32BufferAttribute(shd, 1)); g.setIndex(idx);
+    this.cloudU = { tPuff: { value: tex }, uLit: { value: new THREE.Color(1, 1, 1) }, uShade: { value: new THREE.Color(0.7, 0.72, 0.78) }, uOpacity: { value: 0.9 } };
+    this.cloudMat = new THREE.ShaderMaterial({ uniforms: this.cloudU, transparent: true, depthWrite: false, fog: false,
+      vertexShader: `attribute vec2 corner; attribute float psize; attribute float shade; varying vec2 vUv; varying float vSh;
+        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); mv.xy += corner * psize; vUv = corner * 0.5 + 0.5; vSh = shade; gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform sampler2D tPuff; uniform vec3 uLit; uniform vec3 uShade; uniform float uOpacity; varying vec2 vUv; varying float vSh;
+        void main(){ float a = texture2D(tPuff, vUv).a; if (a < 0.01) discard; vec3 c = mix(uShade, uLit, clamp(vUv.y * 0.8 + vSh * 0.4 + 0.1, 0.0, 1.0)); gl_FragColor = vec4(c, a * uOpacity); }` });
+    this.clouds = new THREE.Mesh(g, this.cloudMat); this.clouds.frustumCulled = false; this.clouds.renderOrder = -1; scene.add(this.clouds);
   }
   // Stilisierter Ozean: Tiefenabhängige Farbe, Schaumkanten am Ufer, facettierte Wellen, Sonnenreflex
   initWater() {
     const D = new Uint8Array(GN * GN * 4);
-    for (let k = 0; k < GN * GN; k++) { const h = HGT[k]; D[k * 4] = clamp(-h / 24, 0, 1) * 255; D[k * 4 + 3] = 255; }
+    for (let k = 0; k < GN * GN; k++) { const h = HGT[k]; D[k * 4] = clamp(-h / 24, 0, 1) * 255; D[k * 4 + 3] = 255; if (h < 0.5) { const x = -WS + (k % GN) * CELL, z = -WS + Math.floor(k / GN) * CELL; D[k * 4 + 1] = Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r * 1.05 ? 255 : inLake(x, z, 30) ? 150 : 0; } }
     const dt = new THREE.DataTexture(D, GN, GN, THREE.RGBAFormat); dt.magFilter = THREE.LinearFilter; dt.minFilter = THREE.LinearFilter; dt.needsUpdate = true;
     this.waterU = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uDepth: { value: null }, uDeep: { value: new THREE.Color('#0b4f78') }, uShallow: { value: new THREE.Color('#2fd0c8') }, uSky: { value: new THREE.Color() }, uSunDir: { value: this.sunDir }, uSunCol: { value: new THREE.Color() }, uAmb: { value: 1 }, uWave: { value: 0.6 }, uWS: { value: WS } }]);
     this.waterU.uDepth.value = dt;
@@ -203,14 +211,14 @@ class Environment {
         #include <fog_pars_fragment>
         void main(){
           vec3 nC = cross(dFdx(vW), dFdy(vW)); vec3 n = dot(nC, nC) > 1e-30 ? normalize(nC) : vec3(0.0, 1.0, 0.0); if (n.y < 0.0) n = -n;
-          vec2 uv = (vW.xz + uWS) / (2.0 * uWS); float depth = (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) ? 24.0 : texture2D(uDepth, uv).r * 24.0;
-          vec3 col = mix(uShallow, uDeep, smoothstep(0.3, 9.0, depth)) * uAmb;
+          vec2 uv = (vW.xz + uWS) / (2.0 * uWS); bool outside = uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0; vec2 dm = outside ? vec2(1.0, 0.0) : texture2D(uDepth, uv).rg; float depth = dm.r * 24.0, murky = dm.g;
+          vec3 col = mix(mix(uShallow, uDeep, smoothstep(0.3, 9.0, depth)), mix(vec3(0.30, 0.36, 0.20), vec3(0.10, 0.20, 0.18), smoothstep(0.2, 3.0, depth)), murky) * uAmb;
           vec3 V = normalize(cameraPosition - vW); float fres = pow(1.0 - max(dot(n, V), 0.0), 4.0);
           col = mix(col, uSky, clamp(fres * 0.75, 0.0, 0.85));
           vec3 H = normalize(V + uSunDir); col += uSunCol * pow(max(dot(n, H), 0.0), 140.0) * 1.6;
           float band = sin(depth * 9.0 - uTime * 2.2 + vW.x * 0.05) * 0.5 + 0.5;
           float foam = (1.0 - smoothstep(0.05, 0.9, depth)) * (0.55 + 0.45 * band) + (1.0 - smoothstep(0.0, 0.25, depth)) * 0.6;
-          col = mix(col, vec3(0.94, 0.97, 1.0) * max(uAmb, 0.25), clamp(foam, 0.0, 1.0) * 0.85);
+          col = mix(col, vec3(0.94, 0.97, 1.0) * max(uAmb, 0.25), clamp(foam, 0.0, 1.0) * 0.85 * (1.0 - murky * 0.85));
           float alpha = mix(0.55, 0.97, smoothstep(0.0, 2.5, depth));
           gl_FragColor = vec4(col, alpha);
           #include <colorspace_fragment>
@@ -276,8 +284,8 @@ class Environment {
     this.flash = Math.max(0, this.flash - dt * 3.5); this.skyU.flash.value = this.flash > 0.05 ? this.flash * rand(0.6, 1) : 0;
     // Wolken: driften, Farbe nach Sonnenlicht
     this.clouds.position.x = (this.clouds.position.x + dt * 3 * (0.5 + this.w.wind)) % 2000; this.clouds.position.z = camera.position.z * 0.0;
-    this.cloudMat.color.copy(c.sun).lerp(tmpCol.setRGB(1, 1, 1), 0.55).lerp(tmpCol.setRGB(0.45, 0.47, 0.52), dark).multiplyScalar(lerp(1, 0.22, baseNight));
-    this.cloudMat.emissive.copy(c.hor).multiplyScalar(0.35 * (1 - baseNight * 0.7)); this.cloudMat.opacity = clamp(0.75 + this.w.turb * 0.02, 0, 0.98);
+    const CU = this.cloudU; CU.uLit.value.copy(c.sun).lerp(tmpCol.setRGB(1, 1, 1), 0.6).lerp(tmpCol.setRGB(0.5, 0.52, 0.57), dark).multiplyScalar(lerp(1, 0.2, baseNight));
+    CU.uShade.value.copy(c.hor).lerp(CU.uLit.value, 0.45).multiplyScalar(lerp(0.78, 0.5, dark)); CU.uOpacity.value = clamp(0.72 + this.w.turb * 0.02, 0, 0.95);
     // Ozean
     const wu = this.waterU; wu.uTime.value += dt; wu.uSky.value.copy(c.hor).lerp(c.top, 0.3); wu.uSunCol.value.copy(c.sun).multiplyScalar(this.sun.intensity / 2.5 * (this.sunDir.y > 0 ? 1 : 0.3)); wu.uSunDir.value.copy(lightDir);
     wu.uAmb.value = lerp(1, 0.13, this.night); wu.uWave.value = 0.5 + this.w.wind * 0.5;

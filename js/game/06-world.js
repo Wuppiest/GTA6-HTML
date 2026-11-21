@@ -757,7 +757,7 @@ function buildVegetation() {
   const dens = Q().trees;
   const NOVEG = new Set(['base', 'downtown', 'port', 'uptown', 'industrial', 'midtown', 'oldtown']);
   for (let k = 0; k < 24000 * dens; k++) {
-    const x = sr(-1950, 1950), z = sr(-1950, 1950), h = terrainHeight(x, z); if (h < (Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r ? 0.35 : 1.5)) continue; const zone = zoneAt(x, z); if (NOVEG.has(zone) || fieldAt(x, z) || inPark(x, z)) continue;
+    const x = sr(-1950, 1950), z = sr(-1950, 1950), h = terrainHeight(x, z); if (h < (Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r ? 0.35 : 1.5)) continue; const zone = zoneAt(x, z); if (NOVEG.has(zone) || fieldAt(x, z) || inPark(x, z) || nearRamp(x, z)) continue;
     const r = Roads.nearest(x, z, 24); if (r && r.d < r.e.hw + 5) continue; if (World.query(x - 3, z - 3, x + 3, z + 3, _qb).length) continue;
     const e = islandE(x, z), fo = fbm(x / 160 + 30, z / 160 - 10, 3); let t;
     if (zone === 'swamp') t = srand() < 0.55 ? 'tree' : srand() < 0.8 ? 'bush' : 'palm';
@@ -766,10 +766,10 @@ function buildVegetation() {
     if (!t || (t !== 'rock' && h > 40 && srand() < 0.25)) continue; if (fo < -0.05 && zone === 'rural' && srand() < 0.55) continue;
     TREES.push({ t, x, z, s: sr(0.8, 1.25) });
   }
-  for (let k = 0; k < 34000 * dens; k++) { // dichte Wälder in Waldflächen
+  for (let k = 0; k < 40000 * dens; k++) { // dichte Wälder in Waldflächen
     const x = sr(-1950, 1950), z = sr(-1950, 1950), fo = fbm(x / 160 + 30, z / 160 - 10, 3), h = terrainHeight(x, z), sw = Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r * 0.95, mt = h > 45;
-    if (fo < (sw ? -0.2 : mt ? -0.08 : 0.1)) continue; if (h < (sw ? 0.3 : 2) || h > 175) continue;
-    const zone = zoneAt(x, z); if (zone !== 'rural' && zone !== 'mountain' && zone !== 'swamp') continue; if (fieldAt(x, z)) continue; const r = Roads.nearest(x, z, 20); if (r && r.d < r.e.hw + 6) continue; if (World.query(x - 4, z - 4, x + 4, z + 4, _qb).length) continue;
+    if (fo < (sw ? -0.2 : mt ? -0.12 : 0.03)) continue; if (h < (sw ? 0.3 : 2) || h > 175) continue;
+    const zone = zoneAt(x, z); if (zone !== 'rural' && zone !== 'mountain' && zone !== 'swamp') continue; if (fieldAt(x, z) || nearRamp(x, z)) continue; const r = Roads.nearest(x, z, 20); if (r && r.d < r.e.hw + 6) continue; if (World.query(x - 4, z - 4, x + 4, z + 4, _qb).length) continue;
     TREES.push({ t: sw ? (srand() < 0.6 ? 'tree' : 'bush') : mt ? (srand() < 0.85 ? 'pine' : 'rock') : srand() < 0.3 ? 'pine' : srand() < 0.12 ? 'bush' : 'tree', x, z, s: sw ? sr(0.6, 1.0) : sr(0.85, 1.35) }); }
   World.palmU = { uTime: { value: 0 }, uWind: { value: 0.6 } };
   const pbr = Q().detail > 0, mats = {};
@@ -813,8 +813,8 @@ function terrainMaterial() {
     sh.fragmentShader = 'uniform sampler2D tGrass; uniform sampler2D tSand; uniform sampler2D tRock; uniform sampler2D tPave; uniform sampler2D tForest; varying vec4 vSplat; varying float vSplat2; varying vec3 vWP;\n' +
       sh.fragmentShader.replace('#include <map_fragment>', `
         vec2 wp = vWP.xz;
-        vec3 cg = texture2D(tGrass, wp / 5.0).rgb * vec3(0.84, 0.9, 0.7), cs = texture2D(tSand, wp / 4.5).rgb, cr = texture2D(tRock, vec2(wp.x + vWP.y * 0.7, wp.y - vWP.y * 0.5) / 9.0).rgb, cp = texture2D(tPave, wp / 4.0).rgb * vec3(0.58, 0.57, 0.55), cf = texture2D(tForest, wp / 5.5).rgb;
-        float macro = texture2D(tGrass, wp / 73.0).g * 1.6 + 0.2;
+        vec3 cg0 = texture2D(tGrass, wp / 5.0).rgb, cg = mix(vec3(dot(cg0, vec3(0.3, 0.55, 0.15))), cg0, 0.62) * vec3(0.86, 0.86, 0.66), cs = texture2D(tSand, wp / 4.5).rgb, cr = texture2D(tRock, vec2(wp.x + vWP.y * 0.7, wp.y - vWP.y * 0.5) / 9.0).rgb, cp = texture2D(tPave, wp / 4.0).rgb * vec3(0.58, 0.57, 0.55), cf = texture2D(tForest, wp / 5.5).rgb;
+        float macro = texture2D(tGrass, wp / 73.0).g * 1.1 + 0.45;
         vec3 tc = (cg * vSplat.x + cs * vSplat.y + cr * vSplat.z + cp * vSplat.w + cf * vSplat2) / max(0.001, vSplat.x + vSplat.y + vSplat.z + vSplat.w + vSplat2);
         diffuseColor.rgb *= tc * mix(1.0, macro, 0.35 * (vSplat.x + vSplat2));`);
   };
@@ -838,7 +838,7 @@ function buildTerrain() {
     W[k * 5] = g * (1 - Math.min(1, sa + pv)); W[k * 5 + 1] = sa; W[k * 5 + 2] = ro; W[k * 5 + 3] = pv; W[k * 5 + 4] = fr * (1 - Math.min(1, sa));
     c.setRGB(1, 1, 1); { const m = fbm(x / 420 + 7, z / 420 - 3, 2); if (m < 0) c.lerp(dry, clamp(-m * 1.6, 0, 0.55)); else c.multiplyScalar(1 - m * 0.18); } if (fo < -0.2) c.lerp(dry, 0.35); if (y < 0) c.multiplyScalar(clamp(1 + y / 30, 0.45, 1));
     if (fld) { const pal = fc[fld.f.type]; c.copy(Math.sin(fld.lx * (fld.f.type === 4 ? 0.35 : 1.4)) > 0 ? pal[0] : pal[1]); } else if (park) c.setRGB(0.86, 1.0, 0.78);
-    if (zn === 'swamp') c.multiply(C3('#a8b088')); else if (zn === 'mountain' || y > 60) c.multiply(C3('#d8dcc0'));
+    if (zn === 'swamp') c.multiply(C3('#a8b088')); else if (zn === 'mountain' || y > 60) c.multiply(C3('#c8ccb0'));
     c.multiplyScalar(0.92 + nz * 0.14); Ct[k * 3] = c.r; Ct[k * 3 + 1] = c.g; Ct[k * 3 + 2] = c.b; }
   const mkChunk = (ci, cj, step) => { const cn = cells / step, n1 = cn + 1, nv = n1 * n1 + 4 * n1, pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3), sp = new Float32Array(nv * 4), sp2 = new Float32Array(nv), idx = [];
     const put = (v, gi, gj, dy) => { const k = gj * GN + gi; pos[v * 3] = -WS + gi * CELL; pos[v * 3 + 1] = HGT[k] - dy; pos[v * 3 + 2] = -WS + gj * CELL; for (let q = 0; q < 3; q++) { nor[v * 3 + q] = Nrm[k * 3 + q]; col[v * 3 + q] = Ct[k * 3 + q]; } for (let q = 0; q < 4; q++) sp[v * 4 + q] = W[k * 5 + q]; sp2[v] = W[k * 5 + 4]; };

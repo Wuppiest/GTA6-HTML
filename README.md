@@ -19,13 +19,16 @@ Flugzeug: W/S Nase runter/hoch, A/D rollen, Q/E Seitenruder, Shift/C Schub.
 Auf dem iPad erscheinen Touch-Steuerelemente automatisch.
 
 ## Inhalte
-- Insel mit Downtown, Ocean Drive, Vorstadt, Coral Heights, Dorf, Hafen, Air Base, Berg, Pier mit Riesenrad
-- 7 Story-Missionen, Taxi- und Pizza-Jobs, 3 Zeitrennen, Stuntsprünge, 30 goldene Muscheln
+- Große Karte (ca. 4 × 4 km): Festland, Biscayne Bay, Strandinsel Solara Beach mit Ocean Drive und Pier, Star Island, Coral Keys
+- Viertel mit eigenem Straßenmuster: Downtown (Hochhäuser, Diagonal-Boulevard, Solara Park), radiale Altstadt, Little Havana, Edgewater, Palm Heights, Kendall, Coral Heights, Hafen, Rust Flats (Industrie), Dörfer San Lorenzo und Pinecrest
+- Landschaft: Farmen mit Feldern, Wälder, Everglades-Sumpf, Seen, Golfplatz, Windpark, Solarfeld, Trailerparks, Raststätten, Mount Leona, Air Base
+- Dämme über die Bucht, Highways (I-95, Dolphin Expressway), Küstenstraße
+- 7 Story-Missionen, Taxi- und Pizza-Jobs, 4 Zeitrennen, Stuntsprünge, 30 goldene Muscheln
 - Shops: Autohaus, Tuning-Werkstatt (Lack, Motor, Bremsen, Fahrwerk, Panzerung, Nitro, Fahndung löschen), Waffenladen, Kleidung, Immobilien mit Einnahmen
 - Funktionierende Ampeln, Verkehr mit Blinkern, Polizei, Tag/Nacht & Wetter, Speichern im Browser
 - Automatische Leistungsanpassung (Auflösung) für flüssiges Spielen
 
 ## Projektstruktur
-`index.html` · `css/` · `js/boot.js` (Lader) · `js/game/01–11` (Spielcode) · `assets/` (Texturen & Modelle) · `vendor/three/` (three.js)
+`index.html` · `css/` · `js/boot.js` (Lader) · `js/game/01–11` (Spielcode, `06b-city.js` = Gebäudetypen & Bebauung) · `assets/` (Texturen & Modelle) · `vendor/three/` (three.js)
 
 Credits: siehe [CREDITS.md](CREDITS.md).

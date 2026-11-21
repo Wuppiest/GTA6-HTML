@@ -41,13 +41,15 @@ const Save = {
 
 // ---------- STUNT-RAMPEN (Weltbau ruft das auf) ----------
 const Ramps = { list: [] };
+// Anlauf- und Landezone einer Rampe frei halten (keine Bäume)
+function nearRamp(x, z) { for (const r of Ramps.list) { const dx = x - r.x, dz = z - r.z, lz = dx * r.s + dz * r.c, lx = dx * r.c - dz * r.s; if (lz > -50 && lz < 100 && Math.abs(lx) < 8) return true; } return false; }
 function buildStunts() {
   const edges = Roads.edges.filter(e => e.type === 'highway' && e.len > 140); let made = 0;
-  for (let i = 0; i < edges.length && made < 7; i += 3) {
-    const e = edges[i], P = e.pts, k = P.length >> 1, p = P[k], q = P[Math.min(P.length - 1, k + 8)]; if (!q || Math.abs(p.tx * q.tx + p.tz * q.tz) < 0.97) continue;
+  for (let i = 0; i < edges.length && made < 7; i++) {
+    const e = edges[(i * 5) % edges.length], P = e.pts, k = P.length >> 1, p = P[k], q = P[Math.min(P.length - 1, k + 8)]; if (!q || Math.abs(p.tx * q.tx + p.tz * q.tz) < 0.97) continue;
     for (const side of [1, -1]) { const off = (e.hw + 7) * side, x = p.x - p.tz * off, z = p.z + p.tx * off, y = terrainHeight(x, z);
-      if (y < 1.5 || Math.abs(y - p.y) > 1.6) continue; let ok = true;
-      for (let d = 0; d < 70 && ok; d += 6) { const xx = x + p.tx * d, zz = z + p.tz * d; if (terrainHeight(xx, zz) < 0.5 || World.query(xx - 4, zz - 4, xx + 4, zz + 4, _qb).some(b => b.tag !== 'prop')) ok = false; }
+      if (y < 1.5 || Math.abs(y - p.y) > 1.6 || Ramps.list.some(r => Math.hypot(r.x - x, r.z - z) < 350)) continue; let ok = true;
+      for (let d = -45; d < 95 && ok; d += 5) { const xx = x + p.tx * d, zz = z + p.tz * d, hh = terrainHeight(xx, zz); if (hh < 0.5 || Math.abs(hh - y) > 4 || World.query(xx - 4, zz - 4, xx + 4, zz + 4, _qb).some(b => obbHit(xx, zz, 3.5, 3.5, 0, b, 0))) ok = false; }
       if (!ok) continue; const yaw = Math.atan2(p.tx, p.tz), F = FR(x, y, z, yaw), L = 11, H = 2.8, W = 4.6, ang = Math.atan2(H, L);
       part(F, G.box(), 0, -0.25, -L / 2, W, 0.3, Math.hypot(L, H), '#ffffff', { rx: -ang, mat: 'planks', keep: true });
       for (const sx of [-1, 1]) { PB(F, sx * (W / 2 - 0.1), -0.5, -L * 0.55, 0.2, H * 0.55 + 0.5, 0.2, '#6a6e74', { mat: 'metal', keep: true }); PB(F, sx * (W / 2 - 0.1), -0.5, -0.4, 0.2, H + 0.4, 0.2, '#6a6e74', { mat: 'metal', keep: true }); }
