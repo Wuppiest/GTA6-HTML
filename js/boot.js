@@ -17,7 +17,7 @@ try {
   window.THREE = THREE;
   window.ADD = { GLTFLoader: gltf.GLTFLoader, KTX2Loader: ktx2.KTX2Loader, merge: bgu.mergeGeometries, cloneSkinned: sku.clone, EffectComposer: comp.EffectComposer, RenderPass: rp.RenderPass,
     UnrealBloomPass: bloom.UnrealBloomPass, OutputPass: outp.OutputPass, ShaderPass: shp.ShaderPass };
-  const files = ['01-core', '02-audio', '03-render', '04-fx', '05-terrain', '06-world', '07-models', '08-vehicles', '09-people', '10-game', '11-activities'];
+  const files = ['01-core', '02-audio', '03-render', '04-fx', '05-terrain', '06-world', '06b-city', '07-models', '08-vehicles', '09-people', '10-game', '11-activities'];
   for (let i = 0; i < files.length; i++) {
     msg('Lade Spielcode … (' + (i + 1) + '/' + files.length + ')'); bar(0.04 + i * 0.01);
     await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'js/game/' + files[i] + '.js?v=' + VER; s.async = false; s.onload = res; s.onerror = () => rej(new Error('Skript fehlt: ' + files[i])); document.head.appendChild(s); });

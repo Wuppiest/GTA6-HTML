@@ -9,7 +9,7 @@ const $ = (id) => document.getElementById(id);
 const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const IS_MOBILE = IS_TOUCH && Math.min(screen.width, screen.height) < 1100;
 const CFG = {
-  WORLD: 1200, GRID: 385, WATER_Y: 0, GRAVITY: 9.81, DAY_LENGTH: 900, START_TIME: 17.3,
+  WORLD: 2000, GRID: 641, WATER_Y: 0, GRAVITY: 9.81, DAY_LENGTH: 900, START_TIME: 17.3,
   QUALITY: {
     low:    { label: 'Niedrig', pr: 0.8, shadows: false, shadowSize: 1024, reflect: 0,    post: false, msaa: 0, peds: 10, traffic: 8,  particles: 700,  rain: 700,  lights: 2, far: 900,  trees: 0.35, terrainStep: 2, detail: 0 },
     medium: { label: 'Mittel',  pr: 1.0, shadows: true,  shadowSize: 1024, reflect: 512,  post: true,  msaa: 0, peds: 22, traffic: 16, particles: 1400, rain: 1600, lights: 4, far: 1400, trees: 0.7,  terrainStep: 1, detail: 1 },

@@ -60,7 +60,7 @@ const Missions = {
   m5(dt, P, pos) {
     const d = this.d;
     if (this.step === 0) { if (!d.boat) { const b = LOC.boats[2] || LOC.boats[0]; d.boat = VS.spawn('speedboat', b.x, b.z, Math.atan2(Math.cos(-0.3), Math.sin(-0.3)), { color: '#0d3b66', mission: true });
-        const th = 0.25, r = coastRadius(th, 0) + 320; d.meet = V3(Math.cos(th) * r, 0, Math.sin(th) * r); d.yacht = VS.spawn('yacht', d.meet.x, d.meet.z, 1.2, { color: '#ffffff', mission: true }); this.say('Elena', 'Mein Kontakt wartet auf der weißen Yacht. Nimm das blaue Speedboot an der Marina.'); }
+        d.meet = V3(1560, 0, 1260); d.yacht = VS.spawn('yacht', d.meet.x, d.meet.z, 1.2, { color: '#ffffff', mission: true }); this.say('Elena', 'Mein Kontakt wartet auf der weißen Yacht. Nimm das blaue Speedboot an der Marina.'); }
       if (d.boat.dead || d.boat.sinking) return 'fail:Das Speedboot wurde zerstört.';
       this.objective = 'Steig in das <b>Speedboot</b> an der Marina.'; this.setWP(d.boat.pos, 4); if (P.vehicle === d.boat) this.step = 1; return; }
     if (this.step === 1) { if (d.boat.dead || d.boat.sinking) return 'fail:Das Speedboot wurde zerstört.'; this.objective = 'Fahre zur <b>Yacht</b> vor der Küste.'; this.setWP(d.meet, 20);
@@ -325,8 +325,10 @@ const UI = {
   },
 };
 function zoneLabel(x, z) {
-  const zn = zoneAt(x, z); if (terrainHeight(x, z) < -0.5) return 'Golf von Solara';
-  return { downtown: 'Downtown Solara', strip: 'Ocean Drive', port: 'Port Solara', suburb: 'Palm Heights', heights: 'Coral Heights', village: 'San Lorenzo', mountain: 'Mount Leona', base: 'Solara Air Base', rural: islandE(x, z) < 0.1 ? 'Küste' : 'Hinterland' }[zn] || '';
+  if (terrainHeight(x, z) < -0.5) return x > 650 && x < 1200 && z > -1450 && z < 1150 ? 'Biscayne Bay' : 'Golf von Solara';
+  const zn = zoneAt(x, z), near = (a, b) => Math.hypot(x - a.x, z - a.z) < Math.hypot(x - b.x, z - b.z);
+  return { downtown: 'Downtown Solara', uptown: 'Edgewater', midtown: 'Little Havana', oldtown: 'Old Town', strip: 'Solara Beach', port: 'Port Solara', industrial: 'Rust Flats', suburb: near(SUBURB, SUBURB2) ? 'Palm Heights' : 'Kendall',
+    heights: Math.hypot(x - STAR.x, z - STAR.z) < 130 ? 'Star Island' : 'Coral Heights', village: near(VILLAGE, VILLAGE2) ? 'San Lorenzo' : 'Pinecrest', keys: 'Coral Keys', swamp: 'Everglades', mountain: 'Mount Leona', base: 'Solara Air Base', rural: islandE(x, z) < 0.1 ? 'Küste' : 'Hinterland' }[zn] || '';
 }
 
 // ---------- GROSSE KARTE ----------
@@ -341,7 +343,7 @@ const BigMap = {
   draw() {
     const cv = $('bigMapCanvas'), g = cv.getContext('2d'), S = cv.width, k = S / (2 * WS), T = (v) => (v + WS) * k; g.drawImage(MAP.canvas, 0, 0, S, S);
     g.font = 'bold 22px Arial'; g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.85)';
-    for (const [t, x, z] of [['DOWNTOWN', DOWNTOWN.x, DOWNTOWN.z], ['PALM HEIGHTS', SUBURB.x, SUBURB.z], ['PORT SOLARA', PORT.x, PORT.z], ['MOUNT LEONA', MOUNT.x, MOUNT.z - 60], ['AIR BASE', BASE.x, BASE.z - 460], ['MARINA', LOC.marina.x - 60, LOC.marina.z], ['CORAL HEIGHTS', HEIGHTS.x, HEIGHTS.z], ['SAN LORENZO', VILLAGE.x, VILLAGE.z]]) g.fillText(t, T(x), T(z));
+    for (const [t, x, z] of [['DOWNTOWN', DOWNTOWN.x, DOWNTOWN.z], ['PALM HEIGHTS', SUBURB.x, SUBURB.z], ['PORT SOLARA', PORT.x, PORT.z], ['MOUNT LEONA', MOUNT.x, MOUNT.z - 60], ['AIR BASE', BASE.x, BASE.z - 460], ['MARINA', LOC.marina.x - 60, LOC.marina.z], ['CORAL HEIGHTS', HEIGHTS.x, HEIGHTS.z], ['SAN LORENZO', VILLAGE.x, VILLAGE.z], ['PINECREST', VILLAGE2.x, VILLAGE2.z], ['LITTLE HAVANA', MIDTOWN.x, MIDTOWN.z], ['OLD TOWN', OLDTOWN.x, OLDTOWN.z], ['EDGEWATER', UPTOWN.x, UPTOWN.z], ['KENDALL', SUBURB2.x, SUBURB2.z], ['RUST FLATS', INDUS.x, INDUS.z], ['EVERGLADES', SWAMP.x, SWAMP.z], ['SOLARA BEACH', beachCX(-300) + 60, -300], ['CORAL KEYS', KEYS[1].x, KEYS[1].z + 140], ['BISCAYNE BAY', 960, 260]]) g.fillText(t, T(x), T(z));
     Missions.defs.forEach((d, i) => { const m = Missions.startMarkers[i].pos; g.beginPath(); g.arc(T(m.x), T(m.z), 12, 0, 7); g.fillStyle = d.color; g.fill(); g.fillStyle = '#fff'; g.font = 'bold 14px Arial'; g.fillText(d.id, T(m.x), T(m.z) + 5); });
     const p = Player.targetPos(); g.beginPath(); g.arc(T(p.x), T(p.z), 10, 0, 7); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 3; g.strokeStyle = '#000'; g.stroke();
     if (Missions.waypoint) { g.fillStyle = '#ffd23a'; g.fillRect(T(Missions.waypoint.x) - 8, T(Missions.waypoint.z) - 8, 16, 16); }
@@ -364,7 +366,7 @@ const AdminUI = {
   },
   build() {
     const el = $('admin'), P = Player.active; const tg = (key, label) => `<button data-tg="${key}" class="${Admin[key] ? 'on' : ''}">${label}</button>`;
-    const locs = [['Downtown', DOWNTOWN.x, DOWNTOWN.z], ['Strand', LOC.beach.x - 30, LOC.beach.z], ['Marina', LOC.marina.x - 25, LOC.marina.z], ['Hafen', LOC.portYard.x, LOC.portYard.z - 30], ['Air Base', LOC.base.x, LOC.base.z], ['Rollbahn', LOC.runway.x, LOC.runway.z], ['Gipfel', LOC.summit.x + 8, LOC.summit.z + 8], ['Leuchtturm', LOC.lighthouse.x - 12, LOC.lighthouse.z], ['Safehouse', LOC.safehouse.x, LOC.safehouse.z], ['Krankenhaus', LOC.hospital.x, LOC.hospital.z], ['Polizei', LOC.police.x, LOC.police.z], ['Neon Plaza', LOC.plaza.x, LOC.plaza.z]];
+    const locs = [['Downtown', DOWNTOWN.x, DOWNTOWN.z], ['Strand', LOC.beach.x - 30, LOC.beach.z], ['Marina', LOC.marina.x - 25, LOC.marina.z], ['Hafen', LOC.portYard.x, LOC.portYard.z - 30], ['Air Base', LOC.base.x, LOC.base.z], ['Rollbahn', LOC.runway.x, LOC.runway.z], ['Gipfel', LOC.summit.x + 8, LOC.summit.z + 8], ['Leuchtturm', LOC.lighthouse.x - 12, LOC.lighthouse.z], ['Safehouse', LOC.safehouse.x, LOC.safehouse.z], ['Krankenhaus', LOC.hospital.x, LOC.hospital.z], ['Polizei', LOC.police.x, LOC.police.z], ['Neon Plaza', LOC.plaza.x, LOC.plaza.z], ['Little Havana', MIDTOWN.x, MIDTOWN.z], ['Altstadt', OLDTOWN.x + 30, OLDTOWN.z], ['Kendall', SUBURB2.x, SUBURB2.z], ['Everglades', LOC.swamp ? LOC.swamp.x : SWAMP.x, LOC.swamp ? LOC.swamp.z : SWAMP.z], ['Star Island', STAR.x, STAR.z], ['Pier', LOC.pier.x - 20, LOC.pier.z]];
     el.innerHTML = `<h2>🛠 ADMIN <button class="close" data-a="close">✕</button></h2>
       <h3>Spieler</h3><div class="grid">${tg('god', 'Godmode')}${tg('infAmmo', 'Unendl. Munition')}${tg('noclip', 'Noclip / Fliegen')}${tg('oneHit', 'One-Hit-Kill')}${tg('noWanted', 'Nie gesucht')}<button data-a="heal">Heilen + Weste</button><button data-a="money">+$100.000</button><button data-a="ammo">Munition voll</button><button data-a="switch">Figur wechseln</button></div>
       <h3>Fahndung</h3><div class="grid">${[0, 1, 2, 3, 4, 5].map(i => `<button data-w="${i}">${i} ★</button>`).join('')}</div>
@@ -458,12 +460,12 @@ const MainMenu = {
     const D = V3(DOWNTOWN.x, 0, DOWNTOWN.z);
     if (LOC.beach) { const B = LOC.beach, bd = V3(B.x - D.x, 0, B.z - D.z).normalize(), side = V3(-bd.z, 0, bd.x);
       out.push({ name: 'Skyline vom Strand', p0: up(B.clone().addScaledVector(bd, 120).addScaledVector(side, -40), 11), p1: up(B.clone().addScaledVector(bd, 105).addScaledVector(side, 20), 13), l0: V3(D.x - side.x * 60, 62, D.z - side.z * 60), l1: V3(D.x - side.x * 40, 58, D.z - side.z * 40) }); }
-    const C = Roads.groups && Roads.groups.collins, n0 = C && C[4], n1 = C && (C[5] || C[3]);
+    const C = Roads.groups && Roads.groups.ocean, n0 = C && C[Math.floor(C.length * 0.55)], n1 = C && C[Math.floor(C.length * 0.55) + 1];
     if (n0 && n1) { const dir = V3(n1.x - n0.x, 0, n1.z - n0.z).normalize(), pr = V3(-dir.z, 0, dir.x), p = V3(n0.x, 0, n0.z).addScaledVector(pr, 5), gy = ground(p.x, p.z);
       out.push({ name: 'Ocean Drive', p0: V3(p.x, gy + 2.2, p.z), p1: V3(p.x + dir.x * 28, gy + 2.6, p.z + dir.z * 28), l0: V3(n0.x + dir.x * 140, gy + 9, n0.z + dir.z * 140), l1: V3(n0.x + dir.x * 170, gy + 8, n0.z + dir.z * 170) }); }
-    if (LOC.pier) { const pd = V3(Math.cos(0.42), 0, Math.sin(0.42)), ps = V3(-pd.z, 0, pd.x), W = LOC.pier.clone().addScaledVector(pd, 110);
+    if (LOC.pier) { const pd = V3(1, 0, 0), ps = V3(-pd.z, 0, pd.x), W = LOC.pier.clone().addScaledVector(pd, 110);
       out.push({ name: 'Solara Pier', p0: up(LOC.pier.clone().addScaledVector(pd, 30).addScaledVector(ps, 70), 9), p1: up(LOC.pier.clone().addScaledVector(pd, 55).addScaledVector(ps, 55), 11), l0: V3(W.x, 24, W.z), l1: V3(W.x, 22, W.z) }); }
-    if (LOC.marina) { const md = V3(Math.cos(-0.3), 0, Math.sin(-0.3)), ms = V3(-md.z, 0, md.x), M = LOC.marina;
+    if (LOC.marina) { const md = V3(1, 0, 0), ms = V3(-md.z, 0, md.x), M = LOC.marina;
       out.push({ name: 'Solara Marina', p0: V3(M.x + md.x * 95 + ms.x * 50, 12, M.z + md.z * 95 + ms.z * 50), p1: V3(M.x + md.x * 80 + ms.x * 10, 9, M.z + md.z * 80 + ms.z * 10), l0: V3(M.x + md.x * 20, 4, M.z + md.z * 20), l1: V3(M.x, 6, M.z) }); }
     out.push({ name: 'Downtown Solara', orbit: true, r: 360, y: 175 });
     if (LOC.summit) { const S = LOC.summit; out.push({ name: 'Mount Leona', p0: up(V3(S.x + 60, 0, S.z + 90), 14), p1: up(V3(S.x + 90, 0, S.z + 55), 16), l0: V3(D.x, 30, D.z), l1: V3(D.x + 80, 30, D.z) }); }
@@ -524,7 +526,7 @@ const Game = {
       const steps = Math.min(4, Math.max(1, Math.ceil(dt * 45))), sdt = dt / steps;
       for (let k = 0; k < steps; k++) { Player.update(sdt); VS.update(sdt, focus); NPCS.update(sdt, focus); Missiles.update(sdt); if (k === 0) { In.pressed.clear(); In.lmbPressed = false; In.wheel = 0; } }
       if (GS.playing) { Wanted.update(dt); Missions.update(dt); Act.update(dt); }
-      Pickups.update(dt); FX.update(dt); Env.update(dt, focus); for (const f of World.anim) f(dt); World.updateLOD(camera.position); Signals.update(dt); FX.pool.update(dt, focus, Env.night);
+      Pickups.update(dt); FX.update(dt); Env.update(dt, focus); for (const f of World.anim) f(dt); World.updateLOD(camera.position); Stream.update(camera.position, menu ? 5 : 3); VegLOD.update(camera.position); Signals.update(dt); FX.pool.update(dt, focus, Env.night);
       if (menu) MainMenu.updateCam(realDt);
       else Cam.update(realDt);
     }

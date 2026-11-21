@@ -159,7 +159,7 @@ const Act = {
   },
   // ---------- ZEITRENNEN ----------
   buildTrials() {
-    const G = Roads.groups, routes = [['Küsten-Sprint', G.ring[30], G.ring[6]], ['City-Rush', G.dt[0][0], G.pt[2][2]], ['Mount Leona Hillclimb', G.spiral[0], G.spiral[10]]]; this.trials = [];
+    const G = Roads.groups, routes = [['Ocean-Drive-Sprint', G.ocean[1], G.ocean[G.ocean.length - 2]], ['City-Rush', G.dt[0][0], G.pt[2][2]], ['Mount Leona Hillclimb', G.spiral[0], G.spiral[10]], ['I-95 Highway-Run', G.hw1[0], G.hw1[G.hw1.length - 1]]]; this.trials = [];
     for (const [name, a, b] of routes) { if (!a || !b) continue; const path = Roads.path(a.id, b.id); if (!path) continue; const cps = []; let last = null, len = 0;
       for (const id of path) { const n = Roads.nodes[id]; if (last) len += Math.hypot(n.x - last.x, n.z - last.z); if (!last || Math.hypot(n.x - last.x, n.z - last.z) > 70 || id === path[path.length - 1]) { cps.push(V3(n.x, n.y, n.z)); last = n; } }
       if (cps.length < 3) continue; const gold = Math.round(len / 33), start = cps.shift(); this.trials.push({ name, start, cps, gold, silver: Math.round(gold * 1.2), id: this.trials.length }); }
@@ -183,10 +183,10 @@ const Act = {
   buildCollectibles() {
     const pts = [], add = (x, z, y = null) => pts.push(V3(x, y ?? groundHeight(x, z, 500) + 0.8, z));
     for (let th = -0.6; th < 0.9; th += 0.17) { const p = coastAt(th, 0.03); add(p.x, p.z); }
-    add(LOC.summit.x + 3, LOC.summit.z + 3); add(LOC.lighthouse.x + 4, LOC.lighthouse.z); if (LOC.pier) add(LOC.pier.x + Math.sin(0.42) * 140, LOC.pier.z + Math.cos(0.42) * 140, 3.3);
+    add(LOC.summit.x + 3, LOC.summit.z + 3); add(LOC.lighthouse.x + 4, LOC.lighthouse.z); if (LOC.pier) add(LOC.pier.x + 140, LOC.pier.z, 3.3); if (LOC.golf) add(LOC.golf.x, LOC.golf.z); if (LOC.swamp) add(LOC.swamp.x + 20, LOC.swamp.z); add(STAR.x, STAR.z); add(KEYS[1].x, KEYS[1].z);
     add(LOC.portYard.x + 12, LOC.portYard.z + 8); add(LOC.base.x + 60, LOC.base.z - 180); add(VILLAGE.x + 10, VILLAGE.z - 5); add(HEIGHTS.x - 20, HEIGHTS.z + 15); add(SUBURB.x - 60, SUBURB.z - 40);
     const roofs = BLD.filter(b => b.h && b.h > 10 && b.h < 45).sort((a, b) => (a.x * 13 + a.z * 7) % 97 - (b.x * 13 + b.z * 7) % 97).slice(0, 6); for (const b of roofs) add(b.x, b.z, groundHeight(b.x, b.z, 500) + 1);
-    for (let k = 0; pts.length < 30 && k < 200; k++) { const x = sr(-900, 900), z = sr(-850, 850), h = terrainHeight(x, z); if (h > 3 && h < 120) add(x, z); }
+    for (let k = 0; pts.length < 30 && k < 200; k++) { const x = sr(-1850, 1500), z = sr(-1700, 1700), h = terrainHeight(x, z); if (h > 3 && h < 140) add(x, z); }
     this.shells = pts.slice(0, 30);
     const g = new THREE.IcosahedronGeometry(0.42, 1), m = new THREE.MeshStandardMaterial({ color: 0xffd23a, emissive: 0xffa000, emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.25 });
     this.shellMesh = new THREE.InstancedMesh(g, m, this.shells.length); this.shellMesh.frustumCulled = false; scene.add(this.shellMesh); this.refreshCollectibles();
@@ -208,11 +208,11 @@ const Act = {
       tmpQ.setFromEuler(tmpE.set(0, a + (b.sp > 0 ? Math.PI : 0), Math.sin(t * b.fl + b.ph) * 0.5)); tmpM.compose(tmpV1.set(x, y, z), tmpQ, tmpV2.set(1.2, 1.2 + Math.sin(t * b.fl + b.ph) * 0.6, 1.2)); this.birdMesh.setMatrixAt(i, tmpM); });
     this.birdMesh.instanceMatrix.needsUpdate = true;
     // Linienflugzeug zieht hoch über die Insel (mit Positionslichtern)
-    this.airT -= dt; if (!this.airliner && this.airT <= 0) { const m = buildVehicleModel('jet', '#f4f4f4'); m.group.scale.setScalar(2.6); scene.add(m.group); const a = Math.random() * Math.PI * 2; this.airliner = { g: m.group, p: V3(Math.cos(a) * 2200, rand(380, 520), Math.sin(a) * 2200), d: V3(-Math.cos(a), 0, -Math.sin(a)) }; }
-    if (this.airliner) { const A = this.airliner; A.p.addScaledVector(A.d, 120 * dt); A.g.position.copy(A.p); A.g.rotation.y = Math.atan2(A.d.x, A.d.z); if (A.p.length() > 2400) { scene.remove(A.g); this.airliner = null; this.airT = rand(40, 90); } }
+    this.airT -= dt; if (!this.airliner && this.airT <= 0) { const m = buildVehicleModel('jet', '#f4f4f4'); m.group.scale.setScalar(2.6); scene.add(m.group); const a = Math.random() * Math.PI * 2; this.airliner = { g: m.group, p: V3(Math.cos(a) * 3000, rand(420, 560), Math.sin(a) * 3000), d: V3(-Math.cos(a), 0, -Math.sin(a)) }; }
+    if (this.airliner) { const A = this.airliner; A.p.addScaledVector(A.d, 120 * dt); A.g.position.copy(A.p); A.g.rotation.y = Math.atan2(A.d.x, A.d.z); if (A.p.length() > 3200) { scene.remove(A.g); this.airliner = null; this.airT = rand(40, 90); } }
     // Frachter / Yacht kreuzt vor der Küste
-    this.shipT -= dt; if (!this.ship && this.shipT <= 0) { const big = Math.random() < 0.5, m = buildVehicleModel(big ? 'yacht' : 'fishing', big ? '#ffffff' : '#2a6f97'); if (big) m.group.scale.setScalar(2.2); scene.add(m.group); const a = rand(-0.8, 1.2), r = 1300; this.ship = { g: m.group, a, r, sp: rand(0.006, 0.012) * (Math.random() < 0.5 ? 1 : -1), life: 0 }; }
-    if (this.ship) { const S = this.ship; S.a += S.sp * dt; S.life += dt; const x = Math.cos(S.a) * S.r, z = Math.sin(S.a) * S.r; S.g.position.set(x, 0, z); S.g.rotation.y = Math.atan2(-Math.sin(S.a) * Math.sign(S.sp), Math.cos(S.a) * Math.sign(S.sp)) ; if (S.life > 240) { scene.remove(S.g); this.ship = null; this.shipT = rand(30, 80); } }
+    this.shipT -= dt; if (!this.ship && this.shipT <= 0) { const big = Math.random() < 0.5, m = buildVehicleModel(big ? 'yacht' : 'fishing', big ? '#ffffff' : '#2a6f97'); if (big) m.group.scale.setScalar(2.2); scene.add(m.group); const dir = Math.random() < 0.5 ? 1 : -1; this.ship = { g: m.group, x: rand(1730, 1850), z: -1700 * dir, sp: rand(5, 9) * dir, life: 0 }; }
+    if (this.ship) { const S = this.ship; S.z += S.sp * dt; S.life += dt; S.g.position.set(S.x, 0, S.z); S.g.rotation.y = S.sp > 0 ? 0 : Math.PI; if (Math.abs(S.z) > 1800 && S.life > 20) { scene.remove(S.g); this.ship = null; this.shipT = rand(30, 80); } }
   },
   // ---------- HAUPT-UPDATE ----------
   update(dt) {
