@@ -64,7 +64,7 @@ const SHOP_DEF = {
   guns: { name: 'Solara Arms', icon: '🔫', color: '#ff4a4a' }, clothes: { name: 'Ocean Threads', icon: '👕', color: '#ff2d95' },
   realty: { name: 'Palm Realty', icon: '🏠', color: '#5fd35f' }, pizza: { name: 'Pizza Piazza', icon: '🍕', color: '#ff7a1a' },
 };
-const DEALER = [['compact', 'Pico Hatch', 6500], ['sedan', 'Aurora Sedan', 9500], ['taxi', 'Solara Cab', 11000], ['suv', 'Ranger XL', 18000], ['muscle', 'Stallion V8', 26000], ['sport', 'Cometa GT', 48000], ['bike', 'Viper 600', 7500], ['speedboat', 'Riva Sprint', 32000], ['plane', 'Skylark 200', 85000], ['heli', 'Mako MH-6', 140000]];
+const DEALER = [['compact', 'Pico Hatch', 6500], ['hatch', 'Zephyr GTi', 12500], ['sedan', 'Aurora Sedan', 9500], ['sedan2', 'Vista Sedan', 10500], ['sportsedan', 'Vortex RS', 34000], ['van', 'Courier Van', 15000], ['pickup', 'Bulldog 2500', 21000], ['luxsuv', 'Monarch LX', 52000], ['taxi', 'Solara Cab', 11000], ['suv', 'Ranger XL', 18000], ['muscle', 'Stallion V8', 26000], ['sport', 'Cometa GT', 48000], ['bike', 'Viper 600', 7500], ['speedboat', 'Riva Sprint', 32000], ['plane', 'Skylark 200', 85000], ['heli', 'Mako MH-6', 140000]];
 const PAINTS = [['Kirschrot', '#b8141e'], ['Mitternacht', '#141a2e'], ['Perlweiß', '#f2f2ee'], ['Vice Pink', '#ff3d9a'], ['Ozeanblau', '#1e6fd0'], ['Limette', '#7ad12a'], ['Gold', '#c9a43a'], ['Graphit', '#3a3d42'], ['Orange', '#ff7a1a'], ['Türkis', '#1fb5a8']];
 const PROPS = [{ id: 'marina', name: 'Marina Loft', price: 45000, income: 600, at: () => LOC.marina }, { id: 'penthouse', name: 'Downtown Penthouse', price: 120000, income: 1500, at: () => LOC.plaza }, { id: 'villa', name: 'Coral Heights Villa', price: 220000, income: 2600, at: () => V3(HEIGHTS.x, 0, HEIGHTS.z) }];
 const Act = {

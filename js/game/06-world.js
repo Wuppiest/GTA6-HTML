@@ -339,7 +339,7 @@ function bHotel(F, w, d, L) {
   roofStuff(F, w, d, 1.1 + H, 2);
   return { top: 1.1 + H, flat: true };
 }
-function bHouse(F, w, d, L, o = {}) {
+function bHouseClassic(F, w, d, L, o = {}) {
   const wall = o.wall || spick(PAL.house), slate = srand() < 0.3, two = srand() < 0.35, h = two ? 6.0 : 3.3, trim = '#ffffff', doorX = sr(-w * 0.2, w * 0.2), det = Q().detail;
   WIN_STYLE = srand() < 0.6 ? 0 : 3;
   PB(F, 0, -1.5, 0, w + 0.5, 1.8, d + 0.5, '#bdb3a2', { mat: 'concrete' }); PB(F, 0, 0.3, 0, w, h, d, wall, { mat: 'plaster' }); PB(F, 0, 0.3 + h - 0.25, 0, w + 0.2, 0.25, d + 0.2, trim, { mat: 'concrete' });
@@ -397,7 +397,8 @@ function bChurch(F, w, d) {
   return { top: 8.3, flat: false };
 }
 // Geparktes Deko-Auto aus echtem Automodell (statisch in die Welt-Meshes gemischt, mit Kollision)
-const PROP_CARS = ['normalcar1', 'normalcar2', 'suv', 'sportscar', 'sportscar2', 'taxi'];
+// Deko-Autos: viele verschiedene Modelle, gewichtet wie im Alltag
+const PROP_CARS = ['sedan', 'sedan', 'compact', 'sedan2', 'sedan2', 'hatch', 'hatch', 'sportsedan', 'suv', 'suv2', 'suv2', 'luxsuv', 'van', 'pickup', 'pickup', 'sport', 'muscle', 'taxi', 'taxi2', 'boxtruck'];
 function propCar(F, x, z, ry, c) {
   const M = FRL(F, x, 0, z, ry), parts = CarLib.staticParts(spick(PROP_CARS));
   if (parts) { const T = new THREE.Matrix4();
@@ -469,7 +470,7 @@ function buildSpecials() {
       for (const x of [-w / 2 - 0.2, w / 2 + 0.2]) PG(F, x, 0.2, d / 2 - 0.4, 0.15, 22, 0.15, '#ff3030'); PB(F, 0, 0.2, d / 2 + 3, 12, 0.3, 6, '#f0f0f0'); PB(F, 0, 4, d / 2 + 3, 14, 0.4, 7, '#d8e0e8');
       signF(F, 'HOSPITAL', '#ff3030', 0, 18, d / 2 + 0.3, 16, 3.6); signF(F, '+', '#ff2020', -w / 2 + 4, 12, d / 2 + 0.3, 4, 4); PC(F, w * 0.25, 22.2, -d * 0.2, 6, 0.15, '#5a5e64', { seg: 16 }); PB(F, w * 0.25 - 1.4, 22.36, -d * 0.2, 0.4, 0.02, 3.5, '#ffffff'); PB(F, w * 0.25 + 1.4, 22.36, -d * 0.2, 0.4, 0.02, 3.5, '#ffffff'); PB(F, w * 0.25, 22.36, -d * 0.2, 2.4, 0.02, 0.4, '#ffffff');
       return { top: 22.2, flat: true }; });
-    LOC.hospital = L.front; LOC.hospital.yaw = L.yaw; PICKUP_SPOTS.push(['health', L.front.x, L.front.z]); }
+    LOC.hospital = L.front; LOC.hospital.yaw = L.yaw; { const ap = lotPoint(L, -L.w / 2 + 6, L.d / 2 + 2.5); PARKED.push(['ambulance', ap.x, ap.z, L.yaw + Math.PI / 2]); } PICKUP_SPOTS.push(['health', L.front.x, L.front.z]); }
   // Polizei-Hauptquartier
   L = specialLot(DOWNTOWN.x + 110, DOWNTOWN.z + 120, 46, 30);
   if (L) { const F = placeBuilding(L, (F, w, d) => { PB(F, 0, -2, 0, w + 0.4, 2.3, d + 0.4, '#8a8378'); PB(F, 0, 0.2, -4, w, 14, d - 8, '#dfe6ef'); facade(F, w, d - 8, 0.4, 4, 3.4, { sp: 3, ww: 2, wh: 1.4, door: 0, day: '#4a6a8a' });
@@ -667,7 +668,9 @@ function buildRoadMeshes() {
       for (const sd of [1, -1]) { const o0 = (hw) * sd, o1 = (hw + 3.2) * sd; ribbon('walk', e, Math.min(o0, o1), Math.max(o0, o1), 0.2, ROADC.walk, kA, kB); ribbon('concrete', e, Math.min(o0, o0 + 0.3 * sd), Math.max(o0, o0 + 0.3 * sd), 0.205, ROADC.curb, kA, kB); wall('concrete', e, o0, 0.0, 0.2, ROADC.curb, kA, kB); wall('concrete', e, o1, -0.8, 0.2, ROADC.walk2, kA, kB); } }
     else if (e.type === 'highway' && zone !== 'strip' && kB > kA) for (const sd of [1, -1]) { wall('metal', e, (hw + 1.22) * sd, 0.45, 0.75, C3('#c4c8cc'), kA, kB); wall('metal', e, (hw + 1.18) * sd, 0.45, 0.75, C3('#c4c8cc'), kA, kB, true); for (let k = kA; k < kB; k += 1) { const p = P[k]; PB(null, p.x - p.tz * (hw + 1.25) * sd, p.y, p.z + p.tx * (hw + 1.25) * sd, 0.12, 0.7, 0.12, '#8a8e92', { mat: 'metal' }); } }
     // Zebrastreifen & Haltelinien an großen Kreuzungen
+    const dirAt = (ed, nd) => { const P2 = ed.pts, q = ed.a === nd.id ? P2[Math.min(3, P2.length - 1)] : P2[Math.max(0, P2.length - 4)]; return Math.atan2(q.x - nd.x, q.z - nd.z); };
     if (e.type === 'street' && e.hw >= 4.5) for (const [node, end] of [[A, 0], [B, 1]]) { if (node.edges.length < 3) continue;
+      const da = dirAt(e, node); if (node.edges.some(i => i !== e.id && Math.abs(wrapAngle(dirAt(Roads.edges[i], node) - da)) < 0.75)) continue; // spitzer Winkel: kein Zebrastreifen
       const k = end === 0 ? Math.min(n - 1, Math.ceil((node.r + 2) / 4)) : Math.max(0, n - 1 - Math.ceil((node.r + 2) / 4)), p = P[k], F = FR(p.x, p.y + 0.08, p.z, Math.atan2(p.tx, p.tz));
       for (let s = -hw + 0.9; s <= hw - 0.9; s += 1.2) PB(F, s, 0, 0, 0.6, 0.02, 2.8, '#ececec', { mat: 'mark', keep: true }); PB(F, (end === 0 ? -1 : 1) * hw / 2, 0, (end === 0 ? 2.2 : -2.2), hw - 0.6, 0.02, 0.4, '#ececec', { mat: 'mark' }); }
   }
@@ -748,6 +751,8 @@ function glbMerged(name, scale = 1) {
 }
 function lodGeo(kind) { const L = [];
   if (kind === 'palm') { L.push([new THREE.CylinderGeometry(0.22, 0.3, 4.4 * 2.4, 4, 1, true).translate(0.4, 5.3, 0), '#7a6448']); for (let k = 0; k < 6; k++) { const g = new THREE.PlaneGeometry(1.2, 4.2).rotateX(-1.1).translate(0, 0.4, 2.0).rotateY(k * 1.05).translate(0.8, 10.2, 0); L.push([g, '#3f7a34']); } }
+  else if (kind === 'birch') { L.push([new THREE.CylinderGeometry(0.2, 0.28, 4.5, 4, 1, true).translate(0, 2.25, 0), '#d8d8d0'], [new THREE.IcosahedronGeometry(2.4, 0).scale(1, 1.3, 1).translate(0, 6.2, 0), '#6a9a40']); }
+  else if (kind === 'willow') { L.push([new THREE.CylinderGeometry(0.3, 0.45, 3, 4, 1, true).translate(0, 1.5, 0), '#5a4030'], [new THREE.IcosahedronGeometry(3.4, 0).scale(1.2, 0.8, 1.2).translate(0, 4.6, 0), '#3f6a2e']); }
   else if (kind === 'tree') { L.push([new THREE.CylinderGeometry(0.25, 0.35, 3.5, 4, 1, true).translate(0, 1.75, 0), '#6a5038'], [new THREE.IcosahedronGeometry(2.8, 0).translate(0, 5.5, 0), '#4f7a36']); }
   else if (kind === 'pine') { L.push([new THREE.ConeGeometry(2.6, 8.5, 6).translate(0, 5.5, 0), '#2f5a32'], [new THREE.CylinderGeometry(0.2, 0.3, 2, 4, 1, true).translate(0, 1, 0), '#5a4030']); }
   else if (kind === 'bush') L.push([new THREE.IcosahedronGeometry(0.9, 0).scale(1, 0.75, 1).translate(0, 0.6, 0), '#3f6a32']);
@@ -755,9 +760,11 @@ function lodGeo(kind) { const L = [];
   else return null;
   const gs = L.map(([g, c]) => { g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); const n = g.attributes.position.count, a = new Float32Array(n * 3), cc = C3(c); for (let i = 0; i < n; i++) { a[i * 3] = cc.r; a[i * 3 + 1] = cc.g; a[i * 3 + 2] = cc.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; });
   return ADD.merge(gs); }
-const VEG = { palm: [['nature/palmtree-1', 2.4], ['nature/palmtree-3', 2.5], ['nature/palmtree-4', 2.6], ['nature/palmtree-2', 2.2]], tree: [['nature/commontree-1', 3.0], ['nature/commontree-2', 2.8], ['nature/commontree-3', 2.9]],
-  pine: [['nature/pinetree-1', 3.6], ['nature/pinetree-2', 3.4]], bush: [['nature/bush-1', 1.3], ['nature/bush-2', 1.3], ['nature/bushberries-1', 1.2]], rock: [['nature/rock-1', 3], ['nature/rock-2', 3.5], ['nature/rock-3', 3.2], ['nature/rock-moss-1', 3]],
-  flower: [['nature/flowers', 1.4], ['nature/plant-1', 1.3]] };
+const VEG = { palm: [['nature/palmtree-1', 2.4], ['nature/palmtree-3', 2.5], ['nature/palmtree-4', 2.6], ['nature/palmtree-2', 2.2]],
+  tree: [1, 2, 3, 4, 5].map(i => ['nature/commontree-' + i, 2.9]), birch: [1, 2, 3, 4, 5].map(i => ['nature/birchtree-' + i, 2.8]), willow: [1, 2, 3, 4, 5].map(i => ['nature/willow-' + i, 2.7]),
+  pine: [1, 2, 3, 4, 5].map(i => ['nature/pinetree-' + i, 3.5]), bush: [['nature/bush-1', 1.3], ['nature/bush-2', 1.3], ['nature/bushberries-1', 1.2], ['nature/bushberries-2', 1.2]],
+  rock: [...[1, 2, 3, 4, 5, 6, 7].map(i => ['nature/rock-' + i, 3]), ...[1, 2, 3, 4].map(i => ['nature/rock-moss-' + i, 3])],
+  flower: [['nature/flowers', 1.4], ...[1, 2, 3, 4, 5].map(i => ['nature/plant-' + i, 1.3])], lily: [['nature/lilypad', 2.2]] };
 function buildVegetation() {
   const dens = Q().trees;
   const NOVEG = new Set(['base', 'downtown', 'port', 'uptown', 'industrial', 'midtown', 'oldtown']);
@@ -767,7 +774,7 @@ function buildVegetation() {
     const e = islandE(x, z), fo = fbm(x / 160 + 30, z / 160 - 10, 3); let t;
     if (zone === 'swamp') t = srand() < 0.55 ? 'tree' : srand() < 0.8 ? 'bush' : 'palm';
     else if (h > 40) t = srand() < 0.75 ? 'pine' : 'rock'; else if (e < 0.12 || zone === 'strip') t = srand() < 0.85 ? 'palm' : 'bush'; else if (zone === 'suburb' || zone === 'heights' || zone === 'village') t = srand() < 0.4 ? 'palm' : srand() < 0.55 ? 'tree' : srand() < 0.7 ? 'bush' : 'flower';
-    else t = fo > 0.1 ? (srand() < 0.7 ? 'tree' : 'pine') : srand() < 0.3 ? 'tree' : srand() < 0.35 ? 'palm' : srand() < 0.75 ? 'bush' : srand() < 0.85 ? 'rock' : null;
+    else t = fo > 0.1 ? (srand() < 0.55 ? 'tree' : srand() < 0.45 ? 'birch' : 'pine') : srand() < 0.3 ? 'tree' : srand() < 0.35 ? 'palm' : srand() < 0.75 ? 'bush' : srand() < 0.85 ? 'rock' : null;
     if (!t || (t !== 'rock' && h > 40 && srand() < 0.25)) continue; if (fo < -0.05 && zone === 'rural' && srand() < 0.55) continue;
     TREES.push({ t, x, z, s: sr(0.8, 1.25) });
   }
@@ -775,7 +782,10 @@ function buildVegetation() {
     const x = sr(-1950, 1950), z = sr(-1950, 1950), fo = fbm(x / 160 + 30, z / 160 - 10, 3), h = terrainHeight(x, z), sw = Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r * 0.95, mt = h > 45;
     if (fo < (sw ? -0.2 : mt ? -0.12 : 0.03)) continue; if (h < (sw ? 0.3 : 2) || h > 175) continue;
     const zone = zoneAt(x, z); if (zone !== 'rural' && zone !== 'mountain' && zone !== 'swamp') continue; if (fieldAt(x, z) || nearRamp(x, z)) continue; const r = Roads.nearest(x, z, 20); if (r && r.d < r.e.hw + 6) continue; if (World.query(x - 4, z - 4, x + 4, z + 4, _qb).length) continue;
-    TREES.push({ t: sw ? (srand() < 0.6 ? 'tree' : 'bush') : mt ? (srand() < 0.85 ? 'pine' : 'rock') : srand() < 0.3 ? 'pine' : srand() < 0.12 ? 'bush' : 'tree', x, z, s: sw ? sr(0.6, 1.0) : sr(0.85, 1.35) }); }
+    const q = srand(); TREES.push({ t: sw ? (q < 0.35 ? 'willow' : q < 0.6 ? 'tree' : 'bush') : mt ? (q < 0.68 ? 'pine' : q < 0.84 ? 'birch' : 'rock') : q < 0.48 ? 'tree' : q < 0.66 ? 'birch' : q < 0.88 ? 'pine' : 'bush', x, z, s: sw ? sr(0.6, 1.0) : sr(0.8, 1.35) }); }
+  // Weiden an Seeufern, Seerosen in Sumpf und Seen
+  for (const L of LAKES) for (let k = 0; k < 26; k++) { const a = sr(0, TAU), d = L.r * sr(1.12, 1.45), x = L.x + Math.cos(a) * d, z = L.z + Math.sin(a) * d, h = terrainHeight(x, z); if (h < 0.8 || Roads.nearest(x, z, 10)) continue; TREES.push({ t: srand() < 0.6 ? 'willow' : 'tree', x, z, s: sr(0.9, 1.25) }); }
+  for (let k = 0; k < 2600; k++) { const x = sr(-1950, 1950), z = sr(-1950, 1950); if (!(Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r || inLake(x, z))) continue; const h = terrainHeight(x, z); if (h > -0.06 || h < -2.6) continue; TREES.push({ t: 'lily', x, z, y: CFG.WATER_Y + 0.03, s: sr(0.7, 1.3), sy: 1 }); }
   World.palmU = { uTime: { value: 0 }, uWind: { value: 0.6 } };
   const pbr = Q().detail > 0, mats = {};
   const matFor = (sway) => { const k = sway ? 'sway' + sway : 'still'; if (mats[k]) return mats[k];
@@ -789,19 +799,21 @@ function buildVegetation() {
       float wv = max(position.y - ${sway.toFixed(1)}, 0.0) * 0.035 * uWind; transformed.x += sin(uTime * 1.6 + ph) * wv; transformed.z += cos(uTime * 1.2 + ph) * wv * 0.7;`); };
     return (mats[k] = mat); };
   // Nah: volle Modelle in kleinen Kacheln · Fern: einfache Ersatzmodelle in großen Kacheln (nahe Instanzen werden dort ausgeblendet)
+  const _tc = new THREE.Color();
   const place = (kind, list, cast, sway) => { const vars = VEG[kind].map(([n, sc]) => glbMerged(n, sc)).filter(Boolean); if (!vars.length || !list.length) return;
     const S = VegLOD.S, B = VegLOD.B, lg = lodGeo(kind), byBig = new Map();
     list.forEach((p, i) => { p.v = (i * 7 + Math.floor(Math.abs(p.x))) % vars.length; p.r = p.r ?? i * 2.39; p.cs = Math.floor((p.x + WS) / S) * 1000 + Math.floor((p.z + WS) / S); const kb = Math.floor((p.x + WS) / B) * 1000 + Math.floor((p.z + WS) / B); let a = byBig.get(kb); if (!a) byBig.set(kb, a = []); a.push(p); });
-    const mtx = (p) => tmpM.compose(tmpV1.set(p.x, terrainHeight(p.x, p.z) - 0.1, p.z), tmpQ.setFromEuler(tmpE.set(0, p.r, 0)), tmpV2.set(p.s, p.s * (p.sy || 1), p.s));
+    const tint = (p) => { const h1 = hash2(Math.floor(p.x * 3.1), Math.floor(p.z * 2.7)), h2 = hash2(Math.floor(p.z * 1.9), Math.floor(p.x * 2.3)), b = 0.8 + h1 * 0.34; return _tc.setRGB(b * (1 + (h2 - 0.5) * 0.16), b, b * (1 - (h2 - 0.5) * 0.2)); };
+    const mtx = (p) => tmpM.compose(tmpV1.set(p.x, p.y ?? terrainHeight(p.x, p.z) - 0.1, p.z), tmpQ.setFromEuler(tmpE.set(0, p.r, 0)), tmpV2.set(p.s, p.s * (p.sy || 1), p.s));
     for (const [, arr] of byBig) { arr.sort((a, b) => a.cs - b.cs);
-      const far = lg ? new THREE.InstancedMesh(lg, matFor(0), arr.length) : null; if (far) { arr.forEach((p, j) => far.setMatrixAt(j, mtx(p))); far.computeBoundingSphere(); far.castShadow = false; far.receiveShadow = true; scene.add(far); }
+      const far = lg ? new THREE.InstancedMesh(lg, matFor(0), arr.length) : null; if (far) { arr.forEach((p, j) => { far.setMatrixAt(j, mtx(p)); far.setColorAt(j, tint(p)); }); far.computeBoundingSphere(); far.castShadow = false; far.receiveShadow = true; scene.add(far); }
       let j0 = 0; while (j0 < arr.length) { let j1 = j0; while (j1 < arr.length && arr[j1].cs === arr[j0].cs) j1++; const grp = arr.slice(j0, j1), cell = VegLOD.cell(grp[0].cs);
-        for (let v = 0; v < vars.length; v++) { const g2 = grp.filter(p => p.v === v); if (!g2.length) continue; const im = new THREE.InstancedMesh(vars[v], matFor(sway), g2.length); g2.forEach((p, j) => im.setMatrixAt(j, mtx(p)));
+        for (let v = 0; v < vars.length; v++) { const g2 = grp.filter(p => p.v === v); if (!g2.length) continue; const im = new THREE.InstancedMesh(vars[v], matFor(sway), g2.length); g2.forEach((p, j) => { im.setMatrixAt(j, mtx(p)); im.setColorAt(j, tint(p)); });
           im.computeBoundingSphere(); im.userData.cast = cast; im.castShadow = false; im.receiveShadow = true; im.visible = false; scene.add(im); cell.near.push(im); }
         if (far) cell.far.push({ mesh: far, start: j0, count: j1 - j0, orig: far.instanceMatrix.array.slice(j0 * 16, j1 * 16) }); j0 = j1; } } };
-  for (const p of TREES) { if (p.t === 'rock' || p.t === 'bush' || p.t === 'flower') continue; World.addOBB(p.x, p.z, 0.32, 0.32, 0, terrainHeight(p.x, p.z) + 6, -50, 'prop'); }
+  for (const p of TREES) { if (p.sy === undefined) p.sy = p.t === 'rock' ? sr(0.6, 1.1) : sr(0.82, 1.22); if (p.t === 'rock' || p.t === 'bush' || p.t === 'flower' || p.t === 'lily') continue; World.addOBB(p.x, p.z, 0.32, 0.32, 0, terrainHeight(p.x, p.z) + 6, -50, 'prop'); }
   const by = (t) => TREES.filter(p => p.t === t);
-  place('palm', by('palm'), true, 2.0); place('tree', by('tree'), true, 1.2); place('pine', by('pine'), true, 1.0); place('bush', by('bush'), false, 0); place('flower', by('flower'), false, 0);
+  place('palm', by('palm'), true, 2.0); place('tree', by('tree'), true, 1.2); place('birch', by('birch'), true, 1.4); place('willow', by('willow'), true, 1.0); place('lily', by('lily'), false, 0); place('pine', by('pine'), true, 1.0); place('bush', by('bush'), false, 0); place('flower', by('flower'), false, 0);
   const rocks = by('rock'); rocks.forEach(p => { p.s = sr(0.8, 2.2); }); place('rock', rocks, true, 0);
 }
 

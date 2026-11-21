@@ -195,21 +195,27 @@ const PeopleLib = {
   // Kleidung: Masken aus der Bind-Pose (T-Pose) im Vertex-Shader, Farben als Uniforms je Figur
   clothMat(src, u) {
     const m = src.clone(); m.onBeforeCompile = (sh) => { Object.assign(sh.uniforms, u);
-      sh.vertexShader = 'uniform float uSleeve; uniform float uPantsEnd; varying vec3 vCloth;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-        { vec3 bp = position; float ax = abs(bp.x); float isArm = step(0.19, ax) * step(1.33, bp.y);
+      sh.vertexShader = 'uniform float uSleeve; uniform float uPantsEnd; varying vec3 vCloth; varying vec3 vBP;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        { vec3 bp = position; vBP = position; float ax = abs(bp.x); float isArm = step(0.19, ax) * step(1.33, bp.y);
           float neckTop = 1.485 + 0.07 * smoothstep(0.035, 0.13, ax) - 0.035 * smoothstep(0.02, 0.09, bp.z) * (1.0 - smoothstep(0.03, 0.08, ax));
           float torso = (1.0 - isArm) * smoothstep(0.97, 1.01, bp.y) * (1.0 - smoothstep(neckTop - 0.012, neckTop + 0.012, bp.y));
           float sleeve = isArm * (1.0 - smoothstep(uSleeve - 0.015, uSleeve + 0.015, ax));
           float legs = (1.0 - isArm) * (1.0 - smoothstep(0.99, 1.02, bp.y)) * smoothstep(uPantsEnd - 0.015, uPantsEnd + 0.015, bp.y);
           float shoe = 1.0 - smoothstep(0.095, 0.115, bp.y); vCloth = vec3(max(torso, sleeve), legs * (1.0 - shoe), shoe); }`);
-      sh.fragmentShader = 'uniform vec3 uShirt; uniform vec3 uPants; uniform vec3 uShoes; uniform vec3 uSkin; varying vec3 vCloth;\n' + sh.fragmentShader
+      sh.fragmentShader = 'uniform vec3 uShirt; uniform vec3 uShirt2; uniform float uPat; uniform float uDress; uniform vec3 uPants; uniform vec3 uShoes; uniform vec3 uSkin; varying vec3 vCloth; varying vec3 vBP;\n' + sh.fragmentShader
         .replace('#include <map_fragment>', `#include <map_fragment>
           float cm = clamp(vCloth.x + vCloth.y + vCloth.z, 0.0, 1.0); float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-          vec3 cloth = uShirt * vCloth.x + uPants * vCloth.y + uShoes * vCloth.z;
+          vec3 shirt = uShirt;
+          if (uPat > 0.5 && uPat < 1.5) shirt = mix(uShirt, uShirt2, step(0.5, fract(vBP.y * 14.0)));
+          else if (uPat > 1.5 && uPat < 2.5) shirt = mix(uShirt, uShirt2, step(0.6, fract(vBP.x * 16.0 + 0.5)));
+          else if (uPat > 2.5 && uPat < 3.5) shirt = mix(uShirt, uShirt2, step(abs(vBP.x), 0.05) * step(0.0, vBP.z));
+          else if (uPat > 3.5) shirt = mix(uShirt, uShirt2, 0.55 * max(step(0.55, fract(vBP.y * 10.0)), step(0.55, fract(vBP.x * 10.0 + vBP.z * 10.0))));
+          vec3 pants = mix(uPants, shirt, uDress);
+          vec3 cloth = shirt * vCloth.x + pants * vCloth.y + uShoes * vCloth.z;
           diffuseColor.rgb = mix(diffuseColor.rgb * uSkin, cloth * (0.82 + lum * 0.5), cm);`)
         .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = normalize(mix(normal, nonPerturbedNormal, clamp(vCloth.x + vCloth.y + vCloth.z, 0.0, 1.0) * 0.75));')
         .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.85, clamp(vCloth.x + vCloth.y + vCloth.z, 0.0, 1.0));'); };
-    m.customProgramCacheKey = () => 'cloth1'; return m;
+    m.customProgramCacheKey = () => 'cloth2'; return m;
   },
 };
 const _hq1 = new THREE.Quaternion(), _hq2 = new THREE.Quaternion(), _hv1 = V3(), _hm1 = new THREE.Matrix4();
@@ -219,7 +225,7 @@ class Humanoid {
     this.female = !!look.female; this.shadows = shadows;
     const gl = Assets.models['people/superhero-' + (this.female ? 'female' : 'male') + '-fullbody'];
     this.root3 = ADD.cloneSkinned(gl.scene); this.group = new THREE.Group(); this.group.add(this.root3);
-    this.u = { uShirt: { value: new THREE.Color() }, uPants: { value: new THREE.Color() }, uShoes: { value: new THREE.Color() }, uSkin: { value: new THREE.Color(1, 1, 1) }, uSleeve: { value: 0.36 }, uPantsEnd: { value: 0.1 } };
+    this.u = { uShirt: { value: new THREE.Color() }, uShirt2: { value: new THREE.Color() }, uPat: { value: 0 }, uDress: { value: 0 }, uPants: { value: new THREE.Color() }, uShoes: { value: new THREE.Color() }, uSkin: { value: new THREE.Color(1, 1, 1) }, uSleeve: { value: 0.36 }, uPantsEnd: { value: 0.1 } };
     this.meshes = []; this.bonesBy = {};
     this.root3.traverse(o => { if (o.isBone) this.bonesBy[o.name] = o;
       if (o.isSkinnedMesh) { o.frustumCulled = false; o.castShadow = shadows; this.meshes.push(o);
@@ -240,6 +246,13 @@ class Humanoid {
     this.gun = new THREE.Mesh(new THREE.BufferGeometry(), MAT.gun); this.gunLen = 0.2; this.gunId = null; this.attach(this.bonesBy.hand_r, this.gun, PeopleLib.fixR, V3(0, -0.06, 0));
     this.cap = new THREE.Mesh(mergeGeos([geoT(CG.frus(0.9, 0.9), 0, 0.235, -0.005, 0, 0, 0, 0.215, 0.075, 0.235), geoT(CG.box(), 0, 0.2, 0.15, -0.12, 0, 0, 0.2, 0.018, 0.13)]), new THREE.MeshStandardMaterial({ color: 0x223355, roughness: 0.8 }));
     this.attach(this.bonesBy.Head, this.cap, null, V3(0, 0, 0)); this.cap.position.add(V3(0, 0, 0)); 
+    const hatMat = () => new THREE.MeshStandardMaterial({ color: 0xd8c08a, roughness: 0.9 });
+    this.hats = { sunhat: new THREE.Mesh(mergeGeos([geoT(CG.cyl(18), 0, 0.212, -0.005, 0, 0, 0, 0.44, 0.012, 0.44), geoT(CG.cyl(14, 0.88), 0, 0.26, -0.005, 0, 0, 0, 0.215, 0.1, 0.235)]), hatMat()),
+      beanie: new THREE.Mesh(mergeGeos([geoT(CG.hsph(12), 0, 0.175, -0.008, 0, 0, 0, 0.222, 0.2, 0.24), geoT(CG.cyl(14), 0, 0.18, -0.008, 0, 0, 0, 0.226, 0.035, 0.244)]), hatMat()),
+      fedora: new THREE.Mesh(mergeGeos([geoT(CG.cyl(16), 0, 0.212, -0.005, 0, 0, 0, 0.33, 0.012, 0.34), geoT(CG.cyl(12, 0.85), 0, 0.265, -0.005, 0, 0, 0, 0.21, 0.1, 0.225), geoT(CG.cyl(12), 0, 0.225, -0.005, 0, 0, 0, 0.214, 0.022, 0.229)]), hatMat()) };
+    for (const h of Object.values(this.hats)) { h.visible = false; this.attach(this.bonesBy.Head, h, null, V3(0, 0, 0)); }
+    this.pack = new THREE.Mesh(mergeGeos([geoT(CG.box(), 0, 0, 0, 0, 0, 0, 0.3, 0.38, 0.14), geoT(CG.box(), 0, -0.08, -0.08, 0, 0, 0, 0.24, 0.16, 0.05)]), new THREE.MeshStandardMaterial({ color: 0x2a3a5a, roughness: 0.85 }));
+    this.pack.visible = false; if (this.bonesBy.spine_03) this.attach(this.bonesBy.spine_03, this.pack, null, V3(0, 0.02, -0.17));
     this.glasses = new THREE.Mesh(mergeGeos([geoT(CG.box(), 0.034, 0.1, 0.105, 0, 0, 0, 0.055, 0.03, 0.01), geoT(CG.box(), -0.034, 0.1, 0.105, 0, 0, 0, 0.055, 0.03, 0.01), geoT(CG.box(), 0, 0.108, 0.105, 0, 0, 0, 0.15, 0.008, 0.008)]), GLASSES_MAT);
     this.attach(this.bonesBy.Head, this.glasses, null, V3(0, 0, 0));
     L1(this.group); this.group.traverse(o => o.layers.set(1));
@@ -258,12 +271,15 @@ class Humanoid {
   setLook(l) {
     const u = this.u; u.uShirt.value.set(l.shirt || '#3a6a9a'); u.uPants.value.set(l.pants || '#2b3a55'); u.uShoes.value.set(l.shoes || '#222');
     const sk = col(l.skin || '#e0ac84'); u.uSkin.value.setRGB(clamp(sk.r * 1.6, 0.35, 1.35), clamp(sk.g * 1.75, 0.3, 1.3), clamp(sk.b * 2.0, 0.25, 1.3));
-    u.uSleeve.value = l.longSleeve ? 0.69 : 0.33; u.uPantsEnd.value = l.shorts ? 0.52 : 0.1;
+    u.uSleeve.value = l.longSleeve ? 0.69 : 0.33; u.uPantsEnd.value = l.dress ? 0.5 : l.shorts ? 0.52 : 0.1; u.uDress.value = l.dress ? 1 : 0; u.uPat.value = l.pattern || 0; u.uShirt2.value.set(l.shirt2 || '#ffffff');
     const style = l.hairStyle || 'short'; for (const k of Object.keys(this.hairMeshes)) this.hairMeshes[k].visible = false;
     const h = this.hairFor(style); if (h) h.visible = true; if (this.hairMat) this.hairMat.color.set(l.hair || '#2a1a10').multiplyScalar(2.2);
     if (!this.female && l.beard) { const b = this.hairFor('beard'); if (b) b.visible = true; }
     if (this.brows) this.brows.material.color.set(l.hair || '#2a1a10').multiplyScalar(2.2);
     this.cap.visible = style === 'cap'; if (this.cap.visible) this.cap.material.color.set(l.capColor || l.hair || '#223355'); this.glasses.visible = !!l.glasses;
+    if (this.hats) for (const [k, h] of Object.entries(this.hats)) { h.visible = l.hat === k && style !== 'cap'; if (h.visible) h.material.color.set(l.hatColor || '#d8c08a'); }
+    if (this.pack) { this.pack.visible = !!l.pack; if (l.pack) this.pack.material.color.set(l.packColor || '#2a3a5a'); }
+    if (l.h && this.root3) this.root3.scale.set(l.w || 1, l.h, l.w || 1);
   }
   setWeapon(w) { const id = w && !w.melee ? w.id : null; if (id === this.gunId) return; this.gunId = id; this.gun.visible = !!id; if (id) { this.gun.geometry = gunGeo(id); this.gunLen = GUN_LEN[id]; } }
   muzzle(out) { out.set(0, -this.gunLen, 0.06); this.group.updateMatrixWorld(true); return this.gun.localToWorld(out); }
@@ -337,6 +353,7 @@ const carMat = {
   get tire() { return _carMat.tire || (_carMat.tire = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.92, metalness: 0 })); },
   get chrome() { return _carMat.chrome || (_carMat.chrome = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, roughness: 0.25, metalness: 0.95 })); },
   get glass() { return _carMat.glass || (_carMat.glass = new THREE.MeshStandardMaterial({ color: 0x0a1016, roughness: 0.04, metalness: 0.75, transparent: true, opacity: 0.82, envMapIntensity: 1.4 })); },
+  get vc() { return _carMat.vc || (_carMat.vc = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.15 })); },
   get head() { return _carMat.head || (_carMat.head = new THREE.MeshStandardMaterial({ color: 0xfff6e0, emissive: 0xfff2d0, emissiveIntensity: 0.6, roughness: 0.2 })); },
 };
 const CarLib = {
@@ -344,6 +361,7 @@ const CarLib = {
   // Geometrien eines Typs vorbereiten: Skalierung auf Zielmaße, Boden auf y=0, Räder per Dreiecks-Klassifikation abtrennen
   prep(type) {
     if (this.cache[type] !== undefined) return this.cache[type]; const D = CAR_MODELS[type], gl = D && Assets.models[D.m]; if (!gl) return (this.cache[type] = null);
+    if (D.k) return (this.cache[type] = KCAR.prep(type, D, gl));
     gl.scene.updateMatrixWorld(true); const raw = []; const bb = new THREE.Box3();
     gl.scene.traverse(o => { if (!o.isMesh) return; let g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); g.computeBoundingBox(); bb.union(g.boundingBox); raw.push([o.name || '', g]); });
     const sx = D.W / (bb.max.x - bb.min.x), sy = D.H / (bb.max.y - bb.min.y), sz = D.L / (bb.max.z - bb.min.z), cx = (bb.max.x + bb.min.x) / 2, cz = (bb.max.z + bb.min.z) / 2, y0 = bb.min.y;
@@ -369,11 +387,12 @@ const CarLib = {
     return (this.cache[type] = { D, body, wheels, stat, wr: D.r * sy, L: D.L, W: D.W, H: D.H });
   },
   // Für den Weltbau: Teile mit Welt-Material-Schlüsseln
-  staticParts(model) { const type = Object.keys(CAR_MODELS).find(t => CAR_MODELS[t].m === 'cars/' + model) || 'sedan', P = this.prep(type); if (!P) return null;
+  staticParts(model) { const type = CAR_MODELS[model] ? model : (Object.keys(CAR_MODELS).find(t => CAR_MODELS[t].m === 'cars/' + model) || 'sedan'), P = this.prep(type); if (!P) return null;
+    if (P.k) return P.stat.map(s => ({ geo: s.geo, mat: s.key === 'paint' ? 'carpaint' : s.key === 'glass' ? 'carglass' : s.key === 'head' || s.key === 'tail' ? 'glow' : 'solid', color: s.key === 'paint' ? (P.D.fixed ? P.paintCol : '#ffffff') : s.key === 'glass' ? '#0c1218' : s.key === 'head' ? '#d8d4c8' : s.key === 'tail' ? '#6a0c0c' : s.col, paint: s.key === 'paint' && !P.D.fixed, m: new THREE.Matrix4() }));
     const map = { paint: ['carpaint', null, true], dark: ['solid', '#151516'], tire: ['solid', '#141414'], grey: ['metal', '#9a9ea4'], glass: ['carglass', '#0c1218'], head: ['glow', '#d8d4c8'], tail: ['glow', '#6a0c0c'], white: ['carpaint', '#f2f2f2'], barB: ['glow', '#1030a0'], barR: ['glow', '#a01010'] };
     return P.stat.map(s => { const m = map[s.key] || map.paint; return { geo: s.geo, mat: m[0], color: m[1] || '#ffffff', paint: !!m[2], m: new THREE.Matrix4() }; }); },
   build(type, color) {
-    const P = this.prep(type); if (!P) return null; const grp = new THREE.Group(), body = new THREE.Group(); grp.add(body);
+    const P = this.prep(type); if (!P) return null; if (P.k) return this.buildK(type, color, P); const grp = new THREE.Group(), body = new THREE.Group(); grp.add(body);
     const add = (geo, mat, cast = true) => { if (!geo) return null; const m = new THREE.Mesh(geo, mat); m.castShadow = cast; body.add(m); return m; };
     const paint = add(P.body.paint, carMat.paint(color)); add(P.body.dark, carMat.dark); add(P.body.grey, carMat.chrome); add(P.body.glass, carMat.glass, false); add(P.body.head, carMat.head, false);
     add(P.body.white, carMat.paint('#f2f2f2')); const tailMat = new THREE.MeshStandardMaterial({ color: 0x3a0505, emissive: 0xff1810, emissiveIntensity: 0.5, roughness: 0.3 }); add(P.body.tail, tailMat, false);
@@ -386,6 +405,85 @@ const CarLib = {
     const seatY = Math.max(0.18, P.H - 1.05);
     return { group: grp, body, paint, wheels, tailMat, bar, blinkers, seat: V3(0.38, seatY, -0.15), len: P.L, wid: P.W, height: P.H, wr: P.wr, pose: 'sit' };
   },
+};
+
+// Weitere Fahrzeuge (Kenney Car Kit, CC0): getrennte Räder, Farbpalette als Textur. fixed = feste Lackierung (Taxi, Einsatzfahrzeuge)
+Object.assign(CAR_MODELS, {
+  sedan2: { k: 1, m: 'cars2/sedan', L: 4.7, W: 1.85 }, sportsedan: { k: 1, m: 'cars2/sedan-sports', L: 4.75, W: 1.9 }, hatch: { k: 1, m: 'cars2/hatchback-sports', L: 4.15, W: 1.8 },
+  suv2: { k: 1, m: 'cars2/suv', L: 4.75, W: 1.95 }, luxsuv: { k: 1, m: 'cars2/suv-luxury', L: 5.05, W: 2.0 }, van: { k: 1, m: 'cars2/van', L: 5.2, W: 2.0 },
+  pickup: { k: 1, m: 'cars2/truck', L: 5.5, W: 2.05 }, flatbed: { k: 1, m: 'cars2/truck-flat', L: 6.0, W: 2.2 }, boxtruck: { k: 1, m: 'cars2/delivery', L: 6.6, W: 2.3 }, stakebed: { k: 1, m: 'cars2/delivery-flat', L: 6.6, W: 2.3 },
+  taxi2: { k: 1, m: 'cars2/taxi', L: 4.8, W: 1.88, fixed: 1 }, police2: { k: 1, m: 'cars2/police', L: 4.9, W: 1.95, fixed: 1 }, ambulance: { k: 1, m: 'cars2/ambulance', L: 6.2, W: 2.3, fixed: 1 },
+  firetruck: { k: 1, m: 'cars2/firetruck', L: 8.8, W: 2.5, fixed: 1 }, garbage: { k: 1, m: 'cars2/garbage-truck', L: 8.2, W: 2.5, fixed: 1 }, tractor: { k: 1, m: 'cars2/tractor', L: 4.0, W: 2.1, fixed: 1 },
+});
+{ const vs = (base, o) => Object.assign({}, CFG.VEHICLES[base], o), heavy = { gears: [4.4, 2.7, 1.75, 1.25, 0.95, 0.75], final: 4.3, cd: 0.62, area: 6.0, mu: 0.85, rpmPeak: 2400, redline: 3600 };
+  Object.assign(CFG.VEHICLES, {
+    sedan2: vs('sedan', { name: 'Vista Sedan', colors: ['#c8ccd0', '#1f3a5a', '#f0f0ea', '#6a1a22', '#2e4a2e', '#3a3a3e', '#b09060', '#4a6a8a'] }),
+    sportsedan: vs('sport', { name: 'Vortex RS', mass: 1620, torque: 430, downforce: 0.35, wb: 2.85, colors: ['#1a1a1e', '#e8e8e8', '#c0102a', '#2a5ad0', '#5a5e64', '#e0a020'] }),
+    hatch: vs('compact', { name: 'Zephyr GTi', mass: 1260, torque: 310, colors: ['#e03020', '#f4f4f4', '#1e8ad0', '#202024', '#f0c020', '#6ac040'] }),
+    suv2: vs('suv', { name: 'Trailblazer', mass: 1900, torque: 420, colors: ['#3a4a3a', '#e8e8e4', '#5a3020', '#2a3a5a', '#8a8e94', '#1a1a1a'] }),
+    luxsuv: vs('suv', { name: 'Monarch LX', mass: 2350, torque: 560, colors: ['#0e0e10', '#f2f2f0', '#3a3a40', '#2a1a10', '#1a2a40'] }),
+    van: vs('suv', { name: 'Courier Van', mass: 2250, torque: 360, cd: 0.45, area: 3.8, wb: 3.2, mu: 0.9, hp: 140, colors: ['#f2f2f0', '#c8ccd0', '#1f4f8a', '#2a2a2e', '#c03028', '#e8d8a0'] }),
+    pickup: vs('suv', { name: 'Bulldog 2500', mass: 2350, torque: 580, wb: 3.4, hp: 170, colors: ['#8a1a1a', '#1a1a1a', '#f0f0f0', '#2a4a6a', '#5a6a4a', '#a8a090', '#d06020'] }),
+    flatbed: vs('suv', Object.assign({ name: 'Hauler Flatbed', mass: 3800, torque: 820, wb: 3.8, brake: 22000, hp: 240, colors: ['#f0f0ea', '#1f4f8a', '#c0392b', '#e0b020'] }, heavy)),
+    boxtruck: vs('suv', Object.assign({ name: 'Haul Box', mass: 4600, torque: 900, wb: 4.0, brake: 24000, hp: 260, colors: ['#f4f4f0', '#e8e0c8', '#2a5aa0', '#c8ccd0'] }, heavy)),
+    stakebed: vs('suv', Object.assign({ name: 'Stake Bed', mass: 4200, torque: 860, wb: 4.0, brake: 23000, hp: 250, colors: ['#3a5a3a', '#f0f0ea', '#8a6a3a', '#2a3a5a'] }, heavy)),
+    taxi2: vs('taxi', { name: 'Metro Cab' }), police2: vs('police', { name: 'Patrol Cruiser' }),
+    ambulance: vs('suv', Object.assign({ name: 'Rescue One', mass: 4000, torque: 820, wb: 3.9, brake: 24000, hp: 260, colors: ['#f4f4f4'] }, heavy, { redline: 4200, rpmPeak: 2800 })),
+    firetruck: vs('suv', Object.assign({ name: 'Engine 7', mass: 14000, torque: 2600, wb: 5.2, brake: 70000, hp: 600, colors: ['#c01010'] }, heavy)),
+    garbage: vs('suv', Object.assign({ name: 'Waste Master', mass: 12000, torque: 2200, wb: 4.8, brake: 60000, hp: 500, colors: ['#3a7a3a'] }, heavy)),
+    tractor: vs('suv', { name: 'Farm Tractor', mass: 3600, torque: 900, gears: [7, 4.5, 3, 2], final: 4.6, rpmPeak: 1600, redline: 2600, wb: 2.6, mu: 1.05, hp: 200, colors: ['#3a8a2a'] }),
+  }); }
+// Farben je Fahrzeugtyp für Sonderfahrzeuge (Lack, Zweitfarbe); sonst Zweitfarbe = Chrom/Grau
+const KFIX = { taxi2: ['#f5c518', '#1a1a1a'], police2: ['#1b1f2a', '#f2f2f2'], ambulance: ['#f2f2f2', '#c8202a'], firetruck: ['#b81010', '#e8e8e8'], garbage: ['#2e7d32', '#d8d8d8'], tractor: ['#3a8a2a', '#e8c020'] };
+const KCAR = {
+  // Paletten-Textur fehlt: Bauteile über Palettenspalte (u) / -zeile (v) und Lage im Modell bestimmen
+  prep(type, D, gl) {
+    gl.scene.updateMatrixWorld(true); const parts = [], bb = new THREE.Box3();
+    gl.scene.traverse(o => { if (!o.isMesh) return; let g = o.geometry.clone().applyMatrix4(o.matrixWorld); g = g.index ? g.toNonIndexed() : g; g.computeBoundingBox(); bb.union(g.boundingBox); parts.push({ wheel: /wheel/i.test(o.name), front: /front/i.test(o.name), g }); });
+    const mL = bb.max.z - bb.min.z, s = D.L / mL, sx = D.W / (bb.max.x - bb.min.x), cx = (bb.max.x + bb.min.x) / 2, cz = (bb.max.z + bb.min.z) / 2, y0 = bb.min.y, H = (bb.max.y - bb.min.y) * s;
+    const triList = (g) => { const P = g.attributes.position.array, N = g.attributes.normal.array, U = g.attributes.uv ? g.attributes.uv.array : null, out = [];
+      for (let t = 0; t < P.length / 9; t++) { const p = [], n = [];
+        for (let v = 0; v < 3; v++) { p.push((P[t * 9 + v * 3] - cx) * sx, (P[t * 9 + v * 3 + 1] - y0) * s, (P[t * 9 + v * 3 + 2] - cz) * s); n.push(N[t * 9 + v * 3] / sx, N[t * 9 + v * 3 + 1] / s, N[t * 9 + v * 3 + 2] / s); }
+        const ax = p[3] - p[0], ay = p[4] - p[1], az = p[5] - p[2], bx = p[6] - p[0], by = p[7] - p[1], bz = p[8] - p[2], area = 0.5 * Math.hypot(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx);
+        const u = U ? Math.round((U[t * 6] + U[t * 6 + 2] + U[t * 6 + 4]) / 3 * 64) : 0, w = U ? Math.round((U[t * 6 + 1] + U[t * 6 + 3] + U[t * 6 + 5]) / 3 * 64) : 0, ny = Math.abs(n[1] + n[4] + n[7]) / 3;
+        out.push({ p, n, u, w, area, y: (p[1] + p[4] + p[7]) / 3 / Math.max(H, 0.01), z: (p[2] + p[5] + p[8]) / 3, ny }); } return out; };
+    const mk = (list, cols = null, ox = 0, oy = 0, oz = 0) => { if (!list.length) return null; const p = new Float32Array(list.length * 9), n = new Float32Array(list.length * 9), c = cols ? new Float32Array(list.length * 9) : null;
+      list.forEach((t, i) => { const lc = cols ? C3(t.col) : null; for (let v = 0; v < 3; v++) { p[i * 9 + v * 3] = t.p[v * 3] - ox; p[i * 9 + v * 3 + 1] = t.p[v * 3 + 1] - oy; p[i * 9 + v * 3 + 2] = t.p[v * 3 + 2] - oz; for (let q = 0; q < 3; q++) n[i * 9 + v * 3 + q] = t.n[v * 3 + q]; if (c) { c[i * 9 + v * 3] = lc.r; c[i * 9 + v * 3 + 1] = lc.g; c[i * 9 + v * 3 + 2] = lc.b; } } });
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.BufferAttribute(n, 3)); if (c) g.setAttribute('color', new THREE.BufferAttribute(c, 3)); g.normalizeNormals(); g.computeBoundingSphere(); return g; };
+    const body = parts.filter(p => !p.wheel).flatMap(p => triList(p.g)), half = D.L / 2, fix = KFIX[type];
+    // Lack = Palettenspalte mit der größten Fläche oberhalb der Gürtellinie (ohne Glas/Lichter)
+    const colA = {}; for (const t of body) if (t.w < 50 && t.y > 0.3) { const k = t.u + '|' + (t.w < 30 ? 'm' : 'g'); colA[k] = (colA[k] || 0) + t.area; }
+    const paintK = Object.keys(colA).sort((a, b) => colA[b] - colA[a])[0] || '', [pu, pb] = paintK.split('|');
+    const second = fix ? fix[1] : '#c4c8cc', gray = (w) => w <= 36 ? '#d8dadc' : w <= 40 ? '#9a9ca0' : w <= 43 ? '#505256' : w <= 45 ? '#2c2d30' : '#18191b';
+    const G = { paint: [], rest: [], glass: [], head: [], tail: [] };
+    for (const t of body) {
+      if (t.w >= 50) { if (t.u <= 10) G.glass.push(t); else if (t.u <= 18 || (t.z > half * 0.6 && t.u !== 22)) G.head.push(t); else if (t.z < -half * 0.6) G.tail.push(t); else G.glass.push(t); continue; }
+      const band = t.w < 30 ? 'm' : 'g';
+      if (String(t.u) === pu && band === pb) G.paint.push(t);
+      else if (t.y < 0.09 && t.ny > 0.7) { t.col = '#141516'; G.rest.push(t); }
+      else if (t.u === 22 || t.y < 0.3) { t.col = gray(Math.max(t.w, 41)); G.rest.push(t); }
+      else if (band === 'm') { t.col = second; G.rest.push(t); }
+      else { t.col = fix ? (t.w <= 40 ? second : gray(t.w)) : gray(t.w); G.rest.push(t); } }
+    const wheels = parts.filter(p => p.wheel).map(p => { const tl = triList(p.g); let x0 = 1e9, x1 = -1e9, y1 = -1e9, ya = 1e9, z0 = 1e9, z1 = -1e9; for (const t of tl) { t.col = t.w >= 45 ? '#141414' : t.w >= 41 ? '#3a3b3e' : '#b8bcc2'; for (let v = 0; v < 3; v++) { x0 = Math.min(x0, t.p[v * 3]); x1 = Math.max(x1, t.p[v * 3]); ya = Math.min(ya, t.p[v * 3 + 1]); y1 = Math.max(y1, t.p[v * 3 + 1]); z0 = Math.min(z0, t.p[v * 3 + 2]); z1 = Math.max(z1, t.p[v * 3 + 2]); } }
+      const x = (x0 + x1) / 2, y = (ya + y1) / 2, z = (z0 + z1) / 2; return { x, y, z, r: (y1 - ya) / 2, front: p.front, tl, geo: mk(tl, true, x, y, z) }; });
+    const paintCol = fix ? fix[0] : '#ffffff';
+    // Statische Variante (geparkte Deko-Autos): Teile je Farbe
+    const stat = [], byCol = new Map(), addC = (t) => { let a = byCol.get(t.col); if (!a) byCol.set(t.col, a = []); a.push(t); };
+    G.rest.forEach(addC); wheels.forEach(w => w.tl.forEach(addC));
+    stat.push({ key: 'paint', geo: mk(G.paint) }); if (G.glass.length) stat.push({ key: 'glass', geo: mk(G.glass) }); if (G.head.length) stat.push({ key: 'head', geo: mk(G.head) }); if (G.tail.length) stat.push({ key: 'tail', geo: mk(G.tail) });
+    for (const [col, list] of byCol) stat.push({ key: 'col', col, geo: mk(list) });
+    return { D: Object.assign({}, D, { fixed: !!fix }), k: true, body: { paint: mk(G.paint), rest: mk(G.rest, true), glass: mk(G.glass), head: mk(G.head), tail: mk(G.tail) }, wheels, stat: stat.filter(s => s.geo), wr: wheels.length ? wheels[0].r : 0.35, L: D.L, W: D.W, H, paintCol };
+  },
+};
+CarLib.buildK = function (type, color, P) {
+  const grp = new THREE.Group(), body = new THREE.Group(); grp.add(body);
+  const add = (geo, mat, cast = true) => { if (!geo) return null; const m = new THREE.Mesh(geo, mat); m.castShadow = cast; body.add(m); return m; };
+  const paint = add(P.body.paint, carMat.paint(P.D.fixed ? P.paintCol : color)); add(P.body.rest, carMat.vc); add(P.body.glass, carMat.glass, false); add(P.body.head, carMat.head, false);
+  const tailMat = new THREE.MeshStandardMaterial({ color: 0x3a0505, emissive: 0xff1810, emissiveIntensity: 0.5, roughness: 0.3 }); add(P.body.tail, tailMat, false);
+  const wheels = P.wheels.map(w => { const piv = new THREE.Group(); piv.position.set(w.x, w.y, w.z); const spin = new THREE.Group(); piv.add(spin); const t = new THREE.Mesh(w.geo, carMat.vc); t.castShadow = true; spin.add(t); grp.add(piv); return { piv, spin, front: w.front, x: w.x, z: w.z, rest: w.y }; });
+  const blinkers = { L: [], R: [] }; if (!carMat.blink) { carMat.blink = new THREE.MeshBasicMaterial({ color: 0xffa020, toneMapped: false }); carMat.blinkGeo = new THREE.BoxGeometry(0.16, 0.07, 0.05); }
+  for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const b = new THREE.Mesh(carMat.blinkGeo, carMat.blink); b.position.set(sx * (P.W / 2 - 0.14), Math.min(1.1, P.H * 0.4), sz * (P.L / 2 - 0.02)); b.visible = false; body.add(b); (sx > 0 ? blinkers.L : blinkers.R).push(b); }
+  return { group: grp, body, paint, wheels, tailMat, bar: null, blinkers, seat: V3(0.38, Math.max(0.18, Math.min(P.H - 1.05, 1.6)), P.L > 6 ? P.L / 2 - 1.6 : -0.15), len: P.L, wid: P.W, height: P.H, wr: P.wr, pose: 'sit' };
 };
 
 // ---------- MOTORRAD ----------

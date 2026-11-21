@@ -387,7 +387,7 @@ class VehicleSystem {
       this.spawnT = 0.5;
       const traffic = this.list.filter(v => v.ai && v.ai.mode === 'traffic').length, want = Math.round(Q().traffic * Admin.trafficMul);
       const pv = Player.vehicle; const high = pv && pv.air && pv.pos.y - terrainHeight(pv.pos.x, pv.pos.z) > 150;
-      if (traffic < want && !high) { const p = this.roadSpawn(focus, 90, 240); if (p) { const r = Math.random(); const type = r < 0.4 ? 'sedan' : r < 0.5 ? 'taxi' : r < 0.65 ? 'suv' : r < 0.76 ? 'sport' : r < 0.9 ? 'muscle' : 'bike';
+      if (traffic < want && !high) { const p = this.roadSpawn(focus, 90, 240); if (p) { const type = pickW(TRAFFIC_MIX);
         const v = this.spawn(type, p.x, p.z, p.yaw); this.makeAI(v, 'traffic', p.e, p.dir, p.s); v.ai.k = Math.round(p.s / p.e.len * (p.e.pts.length - 1)); v.setOccupant(DriverPool.get(randomLook('civ'))); v.occupant._pool = true; v.vel.set(Math.sin(p.yaw) * 10, 0, Math.cos(p.yaw) * 10); } }
       for (const v of [...this.list]) {
         const d = Math.hypot(v.pos.x - focus.x, v.pos.z - focus.z);
@@ -421,14 +421,20 @@ class VehicleSystem {
   circles(v) { const r = v.halfW + 0.05, off = Math.max(0, v.halfL - r), s = Math.sin(v.yaw), c = Math.cos(v.yaw); const out = [[v.pos.x + s * off, v.pos.z + c * off, r], [v.pos.x - s * off, v.pos.z - c * off, r]]; if (off > r) out.push([v.pos.x, v.pos.z, r]); return out; }
   panicAround(pos, r) { for (const v of this.list) if (v.ai && v.ai.mode === 'traffic' && v.pos.distanceTo(pos) < r) v.ai.panic = Math.max(v.ai.panic, rand(4, 8)); }
 }
+// Verkehrsmix: viele Modelle, realistisch gewichtet (Kleinwagen & Limousinen häufig, Lkw selten)
+const TRAFFIC_MIX = [['sedan', 12], ['compact', 7], ['sedan2', 10], ['hatch', 7], ['sportsedan', 4], ['taxi', 5], ['taxi2', 4], ['suv', 7], ['suv2', 7], ['luxsuv', 4], ['pickup', 7], ['van', 6], ['boxtruck', 3], ['flatbed', 2], ['stakebed', 1.5], ['sport', 4], ['muscle', 4], ['bike', 6], ['garbage', 0.8], ['ambulance', 0.8]];
+function pickW(list) { let t = 0; for (const [, w] of list) t += w; let r = Math.random() * t; for (const [k, w] of list) { if ((r -= w) <= 0) return k; } return list[0][0]; }
 const SKINS = ['#f1c9a5', '#e0ac69', '#c68642', '#8d5524', '#a8724a', '#ffdbac', '#6b4423'];
-const SHIRTS = ['#ff6b8a', '#2ad0c0', '#ffd23a', '#ffffff', '#6a8cff', '#ff8a3a', '#9b59b6', '#1abc9c', '#e74c3c', '#f5f5dc', '#ff2d95', '#87ceeb', '#2ecc71', '#333333'];
-const PANTS = ['#2b3a55', '#f2f2f2', '#c2b280', '#333333', '#5a4a3a', '#1f4f7a', '#e8d8b8', '#6a6a6a'];
-const HAIRS = ['#16110d', '#3a1f12', '#8a5a2a', '#d8b060', '#555555', '#a03a1a'];
+const SHIRTS = ['#ff6b8a', '#2ad0c0', '#ffd23a', '#ffffff', '#6a8cff', '#ff8a3a', '#9b59b6', '#1abc9c', '#e74c3c', '#f5f5dc', '#ff2d95', '#87ceeb', '#2ecc71', '#333333', '#6b8e23', '#8b5a2b', '#f4a460', '#b0c4de', '#ffb6c1', '#dda0dd', '#708090', '#ffefd5', '#20b2aa', '#cd5c5c', '#4682b4', '#daa520', '#2f4f4f', '#e9967a', '#f0e68c', '#191970'];
+const PANTS = ['#2b3a55', '#f2f2f2', '#c2b280', '#333333', '#5a4a3a', '#1f4f7a', '#e8d8b8', '#6a6a6a', '#3b5b8a', '#22324a', '#7a8aa0', '#5a5a3a', '#1a1a1a', '#7a1a1a', '#8a6a4a', '#4a5a7a'];
+const HAIRS = ['#16110d', '#3a1f12', '#8a5a2a', '#d8b060', '#555555', '#a03a1a', '#0d0d0d', '#5a3a20', '#e0c890', '#2a1a10'];
 function randomLook(kind) {
   if (kind === 'cop') return { skin: pick(SKINS), shirt: '#2a3f6e', pants: '#1a2238', hair: '#111a33', shoes: '#111', sole: '#111', hairStyle: 'cap', capColor: '#141c33', longSleeve: Math.random() < 0.5, glasses: Math.random() < 0.4, belt: '#111' };
   if (kind === 'gang') return { skin: pick(SKINS), shirt: pick(['#8b0000', '#1a1a1a', '#b01818', '#2a2a2a']), pants: pick(['#1a1a1a', '#2a3550']), hair: '#111', capColor: '#b01818', shoes: '#eee', hairStyle: pick(['cap', 'buzz', 'bald']), longSleeve: Math.random() < 0.4, glasses: Math.random() < 0.3 };
-  const female = Math.random() < 0.5;
-  return { skin: pick(SKINS), shirt: pick(SHIRTS), pants: pick(PANTS), hair: pick(HAIRS), capColor: pick(SHIRTS), shoes: pick(['#222', '#eee', '#8a5a2a', '#c03030', '#2a5aa0']), sole: pick(['#e8e4dc', '#222']),
-    hairStyle: female ? pick(['ponytail', 'ponytail', 'long', 'bun', 'short']) : pick(['short', 'short', 'buzz', 'cap', 'bald']), female, shorts: Math.random() < 0.35, longSleeve: Math.random() < 0.25, glasses: Math.random() < 0.3, belt: pick(['#2a2018', '#111', '#6a4a2a']) };
+  const female = Math.random() < 0.5, old = Math.random() < 0.13, r = Math.random(), dress = female && Math.random() < 0.28;
+  const extra = { pattern: r < 0.55 ? 0 : r < 0.7 ? 1 : r < 0.8 ? 2 : r < 0.92 ? 3 : 4, shirt2: pick(SHIRTS), dress, beard: !female && Math.random() < 0.28, pack: Math.random() < 0.13, packColor: pick(['#2a3a5a', '#1a1a1a', '#8a2a2a', '#3a5a3a', '#c88a2a']),
+    hat: Math.random() < (female ? 0.16 : 0.13) ? pick(female ? ['sunhat', 'sunhat', 'beanie'] : ['fedora', 'sunhat', 'beanie']) : null, hatColor: pick(['#d8c08a', '#f0ead8', '#1a1a1a', '#6a4a2a', '#2a3a5a', '#c03030']),
+    h: female ? 0.92 + Math.random() * 0.09 : 0.95 + Math.random() * 0.11, w: 0.92 + Math.random() * 0.22 };
+  return { ...extra, skin: pick(SKINS), shirt: pick(SHIRTS), pants: pick(PANTS), hair: old ? pick(['#b8b8b8', '#d8d8d8', '#8a8a8a', '#eeeeee']) : pick(HAIRS), capColor: pick(SHIRTS), shoes: pick(['#222', '#eee', '#8a5a2a', '#c03030', '#2a5aa0']), sole: pick(['#e8e4dc', '#222']),
+    hairStyle: female ? pick(['ponytail', 'ponytail', 'long', 'bun', 'short']) : pick(['short', 'short', 'buzz', 'cap', 'bald']), female, shorts: !dress && Math.random() < 0.35, longSleeve: Math.random() < 0.25, glasses: Math.random() < 0.3, belt: pick(['#2a2018', '#111', '#6a4a2a']) };
 }

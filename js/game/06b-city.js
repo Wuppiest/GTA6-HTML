@@ -14,7 +14,7 @@ function obbHit(x, z, hx, hz, yaw, b, gap) {
     if (dist > ra + rb + gap) return false; }
   return true;
 }
-const PARKS = [];
+const PARKS = []; var FARM_TRACTORS = 0;
 // Vegetations-Detailstufen: kleine Kacheln mit vollen Modellen, große Kacheln mit Ersatzmodellen
 const VegLOD = { S: 120, B: 800, nearR: 125, shadowR: 95, cells: new Map(), list: [],
   cell(k) { let c = this.cells.get(k); if (!c) { const cx = Math.floor(k / 1000), cz = k % 1000; c = { x: -WS + (cx + 0.5) * this.S, z: -WS + (cz + 0.5) * this.S, near: [], far: [], on: false }; this.cells.set(k, c); this.list.push(c); } return c; },
@@ -256,6 +256,7 @@ function farmAt(x, z, yaw, big) { // Bauernhof: Haus, Scheune, Silo, Felder, Zä
   const nf = big ? 4 : 3; for (let i = 0; i < nf; i++) { const a = yaw + Math.PI / 2 * i + sr(-0.2, 0.2), dd = sr(70, 95), fx = L.x + Math.cos(a) * dd, fz = L.z + Math.sin(a) * dd; if (zoneAt(fx, fz) !== 'rural' || Roads.nearest(fx, fz, 30)) continue; const fhx = sr(28, 46), fhz = sr(26, 42);
     if ([[1, 1], [-1, 1], [1, -1], [-1, -1], [0, 0]].some(([a, b]) => terrainHeight(fx + a * fhx, fz + b * fhz) < 2.2 || inLake(fx + a * fhx, fz + b * fhz))) continue;
     FIELDS.push({ x: fx, z: fz, hx: fhx, hz: fhz, c: Math.cos(yaw), s: Math.sin(yaw), type: sri(0, 3) }); }
+  if ((FARM_TRACTORS = (typeof FARM_TRACTORS === 'number' ? FARM_TRACTORS : 0) + 1) <= 7) { const tp = LP(F, bx + 1, 0, 12.5); PARKED.push(['tractor', tp.x, tp.z, L.yaw + 0.3]); }
   // Weidezaun ums Gehöft
   const hx = 34, hz = 22; for (const [x0, z0, x1, z1] of [[-hx, -hz, hx, -hz], [-hx, hz, -8, hz], [8, hz, hx, hz], [-hx, -hz, -hx, hz], [hx, -hz, hx, hz]]) { const n = Math.max(1, Math.round(Math.hypot(x1 - x0, z1 - z0) / 3)); for (let k = 0; k <= n; k++) { const p = LP(F, lerp(x0, x1, k / n), 0, lerp(z0, z1, k / n)); PB(null, p.x, terrainHeight(p.x, p.z) - 0.2, p.z, 0.12, 1.4, 0.12, '#8a6a4a'); }
     const a = LP(F, x0, 0, z0), b = LP(F, x1, 0, z1); for (const yy of [0.7, 1.1]) seg(a.x, terrainHeight(a.x, a.z) + yy, a.z, b.x, terrainHeight(b.x, b.z) + yy, b.z, 0.06, 0.06, '#9a7a5a'); }
@@ -395,4 +396,63 @@ function buildBlocks() {
       if (pk[0] === 'lot' || pk[0] === 'yard') { const L = lotFree(px, pz, sr(18, 30), sr(16, 24), yaw, 3); if (L) (pk[0] === 'lot' ? parkingLot : storageYard)(L); continue; }
       LOT_GAP = 1.2; const L = lotFree(px, pz, pk[0], pk[1], yaw, 3); LOT_GAP = 1.5; if (L) placeBuilding(L, pk[2], pk[3]); }
   }
+}
+
+// ---------- HAUSSTILE (Vorstadt, Land, Dörfer) ----------
+function houseDoor(F, x, z, c) { PB(F, x, 0.3, z + 0.02, 1.1, 2.2, 0.12, c || spick(['#7a4a2a', '#2a4a6a', '#ffffff', '#a03a2a', '#3a5a3a'])); PG(F, x + 0.85, 2.0, z + 0.1, 0.16, 0.22, 0.1, '#ffd9a0'); PB(F, x, 0, z + 0.7, 1.8, 0.3, 1.2, '#d8d0c4', { mat: 'concrete' }); }
+function mailbox(F, x, z) { PB(F, x, 0, z, 0.12, 1.1, 0.12, '#666', { mat: 'metal' }); PB(F, x, 1.1, z, 0.35, 0.3, 0.55, spick(['#2a5aa0', '#ffffff', '#c0392b', '#1a1a1a']), { mat: 'metal' }); }
+function hRanch(F, w, d) { // Bungalow im Ranch-Stil: lang, flaches Walmdach, Carport
+  const W = w + 2.5, wall = spick(['#efe6d6', '#d9cbb3', '#e8dccc', '#cfd8d8', '#f2efe6', '#d8c8b0']), roofC = spick(['#ffffff', '#d8d8d8', '#c8b8a8']);
+  PB(F, 0, -1.5, 0, W + 0.5, 1.8, d + 0.5, '#bdb3a2', { mat: 'concrete' }); PB(F, 0, 0.3, 0, W, 2.9, d, wall, { mat: srand() < 0.4 ? 'brick' : 'plaster' });
+  part(F, G.pyr(), 0, 3.2, 0, W + 1.6, 1.5, d + 1.6, roofC, { mat: srand() < 0.5 ? 'slate' : 'roof' }); WIN_STYLE = 3;
+  facade(F, W, d, 0.3, 1, 2.9, { sp: 3.0, ww: 1.6, wh: 1.2, door: -W * 0.25 }); houseDoor(F, -W * 0.25, d / 2, null);
+  const cx = W / 2 + 1.8; for (const z of [-d / 2 + 1, d / 2 - 0.5]) PB(F, cx + 1.4, 0, z, 0.2, 2.6, 0.2, '#e8e8e8', { mat: 'metal' }); PB(F, cx, 2.6, 0, 3.4, 0.2, d + 0.6, '#d8d8d8', { mat: 'metal' });
+  if (Q().detail > 0 && srand() < 0.4) propCar(F, cx, 0, 0, spick(PAL.car)); mailbox(F, -W / 2 + 0.6, d / 2 + 4.6);
+  return { top: 4.7, flat: false, obbW: W };
+}
+function hMission(F, w, d) { // spanischer Stil: heller Putz, Ziegel-Satteldach, Arkaden-Veranda
+  const wall = spick(['#f4e8d4', '#f0dcc0', '#ffe8d0', '#f8f0e0', '#ead2b0']), two = srand() < 0.45, h = two ? 6.2 : 3.6;
+  PB(F, 0, -1.5, 0, w + 0.5, 1.8, d + 0.5, '#bdb3a2', { mat: 'concrete' }); PB(F, 0, 0.3, -0.8, w, h, d - 1.6, wall, { mat: 'plaster' });
+  part(F, G.gable(), 0, 0.3 + h, -0.8, w + 0.9, 2.0, d - 0.6, '#ffffff', { mat: 'roof', ry: Math.PI / 2 });
+  // Arkaden vorne: Pfeiler + dunkle Bögen
+  const n = Math.max(2, Math.round(w / 3.2)); PB(F, 0, 2.7, d / 2 - 0.6, w, 0.9, 1.6, wall, { mat: 'plaster' }); part(F, G.box(), 0, 3.6, d / 2 - 0.4, w + 0.3, 0.25, 2.0, '#ffffff', { mat: 'roof', rx: 0.25 });
+  for (let i = 0; i <= n; i++) PB(F, -w / 2 + 0.3 + i * (w - 0.6) / n, 0.3, d / 2 + 0.05, 0.45, 2.4, 0.45, wall, { mat: 'plaster' });
+  for (let i = 0; i < n; i++) part(F, G.hcyl(10), -w / 2 + 0.3 + (i + 0.5) * (w - 0.6) / n, 2.35, d / 2 + 0.08, (w - 0.6) / n - 0.45, 0.7, 0.4, '#6a5a4a', { rx: 0, ry: 0 });
+  WIN_STYLE = 0; facade(F, w, d - 1.6, 0.3, two ? 2 : 1, 3.0, { sp: 3.2, ww: 1.1, wh: 1.5, door: 0, shutters: srand() < 0.5 ? spick(['#2a5a7a', '#5a3a20', '#2a6a4a']) : null, only: [Math.PI, Math.PI / 2, -Math.PI / 2] });
+  houseDoor(F, 0, d / 2 - 1.6, '#5a3a20'); PB(F, w / 2 - 1.2, 0.3 + h, -1.5, 0.9, 1.6, 0.9, wall, { mat: 'plaster' });
+  for (const sx of [-1, 1]) { const q = LP(F, sx * (w / 2 + 1.6), 0, d / 2 + 2); TREES.push({ t: 'palm', x: q.x, z: q.z, s: sr(0.8, 1.05) }); }
+  mailbox(F, -w / 2 + 0.6, d / 2 + 4.6); return { top: 0.3 + h + 2.0, flat: false };
+}
+function hModern(F, w, d) { // moderner Kubus: Flachdach, große Fenster, Holzverkleidung
+  const c1 = spick(['#f4f4f2', '#e2e2e0', '#3a3c40', '#d8d4cc']), wood = '#ffffff';
+  PB(F, 0, -1.5, 0, w + 0.5, 1.8, d + 0.5, '#bdb3a2', { mat: 'concrete' }); PB(F, -w * 0.15, 0.3, 0, w * 0.7, 3.2, d, c1, { mat: 'plaster' }); PB(F, w * 0.35, 0.3, -d * 0.1, w * 0.3, 3.2, d * 0.8, wood, { mat: 'planks' });
+  PB(F, w * 0.08, 3.5, -d * 0.08, w * 0.75, 2.9, d * 0.8, c1, { mat: 'plaster' }); PB(F, w * 0.08, 6.4, -d * 0.08, w * 0.8, 0.25, d * 0.85, '#2a2c30', { mat: 'metal' }); PB(F, -w * 0.15, 3.5, 0, w * 0.72, 0.18, d + 0.2, '#2a2c30', { mat: 'metal' });
+  WIN_STYLE = 1; PW(F, -w * 0.15, 1.8, d / 2 + 0.05, w * 0.55, 2.4, 0, litCol() || 0xffe8c0, 1); PW(F, w * 0.08, 4.9, d * 0.32 + 0.05, w * 0.6, 2.0, 0, litCol(), 1);
+  houseDoor(F, w * 0.35, d / 2, '#2a2c30'); if (Q().detail > 0 && srand() < 0.5) { PB(F, 0, 0, -d / 2 - 4, w, 0.35, 5, '#e8e4dc', { mat: 'plaza' }); part(F, G.box(), 0, 0.31, -d / 2 - 4, w * 0.75, 0.06, 3.6, '#ffffff', { mat: 'pool' }); }
+  mailbox(F, -w / 2 + 0.6, d / 2 + 4.6); return { top: 6.65, flat: true };
+}
+function hColonial(F, w, d) { // zweigeschossig, Holzfassade, Säulenveranda, Satteldach
+  const c = spick(['#f4f4f0', '#dfe8f0', '#f6efd8', '#e8e0f0', '#dcefe0', '#f8e4d8']), roofC = spick(['#8a9aaa', '#5a6a7a', '#d8d0c4']);
+  PB(F, 0, -1.5, 0, w + 0.5, 1.8, d + 0.5, '#bdb3a2', { mat: 'concrete' }); PB(F, 0, 0.3, -0.7, w, 6.0, d - 1.4, c, { mat: 'planks' });
+  part(F, G.gable(), 0, 6.3, -0.7, w + 0.8, 2.6, d - 0.8, roofC, { mat: 'slate' }); WIN_STYLE = 0;
+  facade(F, w, d - 1.4, 0.3, 2, 3.0, { sp: 2.6, ww: 1.0, wh: 1.6, door: 0, shutters: spick(['#2a3a5a', '#1a1a1a', '#3a5a3a', '#7a2a2a']) });
+  PB(F, 0, 0.3, d / 2 - 0.6, w - 0.4, 0.2, 2.2, '#f0f0f0', { mat: 'planks' }); PB(F, 0, 3.0, d / 2 - 0.6, w, 0.25, 2.4, '#ffffff', { mat: 'concrete' });
+  for (let i = 0; i < 4; i++) PC(F, -w / 2 + 0.6 + i * (w - 1.2) / 3, 0.5, d / 2 + 0.3, 0.14, 2.5, '#ffffff', { seg: 8, keep: true });
+  houseDoor(F, 0, d / 2 - 1.4, spick(['#1a1a1a', '#7a2a2a', '#2a3a5a'])); PB(F, w / 2 - 1.0, 6.3, -1.2, 0.8, 2.6, 0.8, '#8a5a4a', { mat: 'brick' });
+  mailbox(F, -w / 2 + 0.6, d / 2 + 4.6); return { top: 8.9, flat: false };
+}
+function hBungalow(F, w, d) { // kleines Holzhaus mit Giebelveranda
+  const W = Math.min(w, 10), c = spick(PAL.house);
+  PB(F, 0, -1.5, 0, W + 0.5, 1.8, d + 0.5, '#bdb3a2', { mat: 'concrete' }); PB(F, 0, 0.3, 0, W, 3.0, d, c, { mat: srand() < 0.5 ? 'planks' : 'plaster' });
+  part(F, G.gable(), 0, 3.3, 0, W + 0.8, 2.2, d + 0.8, '#ffffff', { mat: srand() < 0.5 ? 'roof' : 'slate' }); part(F, G.gable(), 0, 2.8, d / 2 + 1.2, 4.2, 1.4, 2.6, c, { mat: 'plaster' });
+  for (const sx of [-1.8, 1.8]) PB(F, sx, 0.3, d / 2 + 2.3, 0.2, 2.5, 0.2, '#ffffff'); PB(F, 0, 0.3, d / 2 + 1.2, 4, 0.2, 2.4, '#a8805a', { mat: 'planks' });
+  WIN_STYLE = srand() < 0.5 ? 0 : 3; facade(F, W, d, 0.3, 1, 3.0, { sp: 2.8, ww: 1.1, wh: 1.3, door: 0 }); houseDoor(F, 0, d / 2, null);
+  mailbox(F, -W / 2 + 0.6, d / 2 + 4.6); return { top: 5.5, flat: false, obbW: W };
+}
+function bHouse(F, w, d, L, o = {}) {
+  if (o.wall || o.noCar || o.classic) return bHouseClassic(F, w, d, L, o);
+  const zn = L && L.x !== undefined ? zoneAt(L.x, L.z) : 'suburb', r = srand();
+  const style = zn === 'rural' || zn === 'mountain' ? (r < 0.35 ? 'ranch' : r < 0.6 ? 'bungalow' : r < 0.75 ? 'colonial' : 'classic')
+    : zn === 'heights' ? (r < 0.5 ? 'modern' : r < 0.8 ? 'mission' : 'classic') : (r < 0.3 ? 'classic' : r < 0.47 ? 'mission' : r < 0.62 ? 'ranch' : r < 0.75 ? 'modern' : r < 0.88 ? 'colonial' : 'bungalow');
+  return style === 'ranch' ? hRanch(F, w, d) : style === 'mission' ? hMission(F, w, d) : style === 'modern' ? hModern(F, w, d) : style === 'colonial' ? hColonial(F, w, d) : style === 'bungalow' ? hBungalow(F, w, d) : bHouseClassic(F, w, d, L, o);
 }
