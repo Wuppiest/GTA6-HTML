@@ -160,8 +160,8 @@ class Input {
       const k = b.dataset.t;
       b.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); Audio.init(); b.classList.add('on');
         if (k === 'fire') { this.lmb = true; this.lmbPressed = true; } else if (k === 'aim') { this.touchAim = !this.touchAim; this.rmb = this.touchAim; b.classList.toggle('on', this.touchAim); }
-        else if (k === 'wheel') this.wheel += 1; else { const code = k === 'KeyE2' ? 'KeyE' : k; this.pressed.add(code); this.down.add(code); } }, { passive: false });
-      const up = (e) => { e.preventDefault(); if (k !== 'aim') b.classList.remove('on'); if (k === 'fire') this.lmb = false; else if (k !== 'aim' && k !== 'wheel') this.down.delete(k === 'KeyE2' ? 'KeyE' : k); };
+        else if (k === 'wheel' || k === 'emote') { if (typeof Radial !== 'undefined') Radial.toggle(k === 'wheel' ? 'weapon' : 'emote'); else this.wheel += 1; } else { const code = k === 'KeyE2' ? 'KeyE' : k; this.pressed.add(code); this.down.add(code); } }, { passive: false });
+      const up = (e) => { e.preventDefault(); if (k !== 'aim') b.classList.remove('on'); if (k === 'fire') this.lmb = false; else if (k !== 'aim' && k !== 'wheel' && k !== 'emote') this.down.delete(k === 'KeyE2' ? 'KeyE' : k); };
       b.addEventListener('touchend', up, { passive: false }); b.addEventListener('touchcancel', up, { passive: false });
     }
   }

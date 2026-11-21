@@ -272,10 +272,10 @@ class Vehicle {
         if (this.wheelH && !this.isBike) { const hi = w.z > 0 ? (w.x > 0 ? (this.wheelH[0] + this.wheelH[2]) / 2 : (this.wheelH[0] + this.wheelH[3]) / 2) : (w.x > 0 ? (this.wheelH[1] + this.wheelH[2]) / 2 : (this.wheelH[1] + this.wheelH[3]) / 2); w.piv.position.y = w.rest + clamp(hi - this.pos.y, -0.12, 0.15) * 0.5; } }
     }
     this.m.tailMat.emissiveIntensity = this.dead ? 0 : this.braking ? 4 : 0.5 + Env.night * 1.2;
-    if (this.m.blinkers) { const on = !this.dead && Math.floor(GameTime * 3) % 2 === 0; for (const b of this.m.blinkers.L) b.visible = on && this.blink === -1; for (const b of this.m.blinkers.R) b.visible = on && this.blink === 1; }
+    if (this.m.blinkers) { const on = !this.dead && Math.floor(GameTime * 3) % 2 === 0; for (const b of this.m.blinkers.L) b.visible = on && (this.blink === -1 || this.blink === 2); for (const b of this.m.blinkers.R) b.visible = on && (this.blink === 1 || this.blink === 2); }
     if (this.m.beam) this.m.beam.visible = this.sirenOn && !this.dead && Env.night > 0.25;
     if (this.m.bar) { const on = this.sirenOn && !this.dead, ph = Math.floor(GameTime * 7) % 2; this.m.bar[0].emissiveIntensity = on ? (ph ? 9 : 0.3) : 0.2; this.m.bar[1].emissiveIntensity = on ? (ph ? 0.3 : 9) : 0.2; }
-    if (this.occupant) this.occupant.animate(dt, { sit: true, bike: this.occupant.pose === 'bike', speed: 0 });
+    if (this.occupant) { const oa = this.occAnim; this.occupant.animate(dt, { sit: !oa || oa.sit, act: oa && oa.act, bike: this.occupant.pose === 'bike', speed: 0 }); }
     if (dt > 0 && !this.sinking) {
       this.smokeT -= dt;
       if (!this.dead && this.health < this.spec.hp * 0.35 && this.smokeT <= 0) { this.smokeT = this.health <= 0 ? 0.05 : 0.18; tmpV2.copy(this.pos).addScaledVector(tmpV3.set(Math.sin(this.yaw), 0, Math.cos(this.yaw)), this.halfL * 0.6); tmpV2.y += 1; FX.smoke(tmpV2, 1, this.health > this.spec.hp * 0.15, 0.9); if (this.health <= 0) FX.fire(tmpV2, 2); }

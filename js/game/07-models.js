@@ -171,10 +171,28 @@ class LowHumanoid { // einfache Ersatzfigur (falls Modelle fehlen)
     if (s.cower) { T.hipsY = 0.6; T.tL = T.tR = -1.3; T.sL = T.sR = 2; T.uaL = T.uaR = -2.7; T.faL = T.faR = -1.9; T.uaLz = -0.5; T.uaRz = 0.5; T.spineX = 0.45; }
     if (s.handsUp) { T.uaL = T.uaR = -2.9; T.faL = T.faR = -0.4; }
     if (s.phone && !s.aim) { T.uaR = -0.45; T.uaRz = -0.5; T.faR = -2.35; T.spineX = 0.06; }
+    const ac = s.act, tt = GameTime;
+    if (ac === 'wave') { T.uaR = -2.6; T.uaRz = -0.3 + Math.sin(tt * 9) * 0.35; T.faR = -0.45; }
+    else if (ac === 'dance') { const b = Math.sin(tt * 7.5); T.hipsY = 0.95 + Math.abs(b) * 0.04; T.chestY = b * 0.35; T.uaL = -1.3 + b * 0.7; T.uaR = -1.3 - b * 0.7; T.faL = T.faR = -1.4; T.tL = Math.min(0, -b) * 0.5; T.tR = Math.min(0, b) * 0.5; T.sL = -T.tL * 1.3; T.sR = -T.tR * 1.3; T.uaLz = 0.5; T.uaRz = -0.5; }
+    else if (ac === 'cheer') { const b = Math.abs(Math.sin(tt * 6)); T.uaL = T.uaR = -2.75 + b * 0.35; T.uaLz = 0.35; T.uaRz = -0.35; T.faL = T.faR = -0.25; T.hipsY = 0.98 + b * 0.05; }
+    else if (ac === 'clap') { const b = Math.sin(tt * 15); T.uaL = T.uaR = -1.15; T.uaLz = -0.3 + b * 0.14; T.uaRz = 0.3 - b * 0.14; T.faL = T.faR = -0.85; }
+    else if (ac === 'point') { T.uaR = -1.5; T.faR = -0.05; T.uaRz = 0.1; T.chestY = 0.2; }
+    else if (ac === 'smoke') { const b = (tt * 0.35 + this.phase * 0.1) % 1 < 0.25; T.uaR = b ? -0.55 : -0.25; T.uaRz = -0.45; T.faR = b ? -2.4 : -1.5; }
+    else if (ac === 'watch') { T.uaL = -0.9; T.uaLz = 0.6; T.faL = -1.9; T.headX = 0.45; T.spineX = 0.08; }
+    else if (ac === 'stretch') { const b = Math.sin(tt * 1.3) * 0.5 + 0.5; T.uaL = T.uaR = -2.9 * b - 0.2; T.uaLz = 0.2; T.uaRz = -0.2; T.spineX = -0.15 * b; T.faL = T.faR = -0.2; }
+    else if (ac === 'shrug') { T.uaL = T.uaR = -0.3; T.uaLz = 0.7; T.uaRz = -0.7; T.faL = T.faR = -1.6; T.headX = -0.1; }
+    else if (ac === 'facepalm') { T.uaR = -1.2; T.uaRz = -0.4; T.faR = -2.3; T.spineX = 0.25; T.headX = 0.35; }
+    else if (ac === 'think') { T.uaR = -0.9; T.uaRz = -0.6; T.faR = -2.4; T.uaL = -0.4; T.uaLz = -0.4; T.faL = -1.6; T.headX = 0.15; }
+    else if (ac === 'sitGround') { T.hipsY = 0.22; T.tL = T.tR = -1.5; T.sL = T.sR = 0.25; T.uaL = T.uaR = 0.55; T.faL = T.faR = -0.15; T.spineX = -0.25; T.uaLz = 0.2; T.uaRz = -0.2; }
+    else if (ac === 'pushup') { const b = Math.sin(tt * 4) * 0.5 + 0.5; T.rootX = 1.45; T.rootY = 0.25 + b * 0.25; T.uaL = T.uaR = -1.5; T.faL = T.faR = -1.3 * (1 - b); T.tL = T.tR = 0; T.sL = T.sR = 0; T.hipsY = 0.98; }
+    else if (ac === 'climb') { T.tL = -1.35; T.sL = 1.5; T.tR = -0.2; T.uaR = -1.9; T.faR = -0.4; T.uaL = -1.2; T.faL = -0.6; T.spineX = 0.3; }
+    else if (ac === 'salute') { T.uaR = -2.0; T.uaRz = -1.0; T.faR = -2.1; }
+    else if (ac === 'bow') { T.spineX = 0.75; T.headX = 0.3; T.uaL = T.uaR = 0.15; }
+    else if (ac === 'hello') { T.uaR = -1.4; T.uaRz = -0.9 + Math.sin(tt * 8) * 0.25; T.faR = -1.3; }
     this.deadAmt = s.dead ? Math.min(1, this.deadAmt + dt * 3) : 0;
     if (this.deadAmt > 0) { T.rootX = -Math.PI / 2 * smooth(this.deadAmt); T.rootY = 0.12 * this.deadAmt; T.tL = 0.15; T.tR = -0.2; T.sL = 0.3; T.sR = 0.1; T.uaL = -0.3; T.uaR = 0.4; T.uaLz = 1.1; T.uaRz = -1.1; T.faL = T.faR = -0.3; T.spineX = 0; T.hipsY = 0.98; }
     const k = 1 - Math.exp(-18 * dt), K = (o, prop, v) => { o[prop] += (v - o[prop]) * k; };
-    K(B.hips.position, 'y', T.hipsY); K(B.spine.rotation, 'x', T.spineX); K(B.chest.rotation, 'y', T.chestY);
+    K(B.hips.position, 'y', T.hipsY); K(B.spine.rotation, 'x', T.spineX); K(B.chest.rotation, 'y', T.chestY); K(B.neck.rotation, 'x', T.headX);
     K(B.thighL.rotation, 'x', T.tL); K(B.thighR.rotation, 'x', T.tR); K(B.thighL.rotation, 'z', T.tLz); K(B.thighR.rotation, 'z', -T.tLz); K(B.shinL.rotation, 'x', T.sL); K(B.shinR.rotation, 'x', T.sR); K(B.footL.rotation, 'x', T.fL); K(B.footR.rotation, 'x', T.fR);
     K(B.uArmL.rotation, 'x', T.uaL); K(B.uArmR.rotation, 'x', T.uaR); K(B.uArmL.rotation, 'z', T.uaLz); K(B.uArmR.rotation, 'z', T.uaRz); K(B.uArmL.rotation, 'y', T.uaLy);
     K(B.fArmL.rotation, 'x', T.faL); K(B.fArmR.rotation, 'x', T.faR);

@@ -118,7 +118,7 @@ const Act = {
   menuPizza(pl) { Menu.show('🍕 Pizza Piazza', 'Liefere heiße Pizzen an hungrige Kunden – je schneller, desto mehr Trinkgeld.', [{ label: this.job ? 'Job beenden' : 'Lieferjob starten', price: null, right: '▶', action: () => { Menu.close(); this.job ? this.endJob() : this.startPizza(); return 'keep'; } }], null, pl); },
   // ---------- GARAGE & LIEFERUNG ----------
   deliver(i) { const g = this.garage[i]; if (!g) return; const S = CFG.VEHICLES[g.type], P = Player.targetPos(); let x, z, yaw = 0;
-    if (S.cls === 'boat') { const b = LOC.boats[0]; x = b.x; z = b.z; } else if (S.cls === 'plane' || S.cls === 'heli') { const h = S.cls === 'heli' && !S.blimp ? LOC.helipads[0] : LOC.runway; x = h.x; z = h.z; yaw = LOC.runway.yaw || 0; }
+    if (S.cls === 'boat') { const b = LOC.boats[0]; x = b.x; z = b.z; } else if (S.cls === 'plane' || S.cls === 'heli') { const h = S.cls === 'heli' && !S.blimp ? (LOC.airfieldPad || LOC.helipads[0]) : (LOC.airfield || LOC.runway); x = h.x; z = h.z; yaw = (h.yaw ?? LOC.runway.yaw) || 0; }
     else { const r = Roads.nearest(P.x, P.z, 120, e => e.type !== 'service'); if (r) { x = r.p.x + r.p.tx * 6 - r.p.tz * (r.e.hw * 0.5); z = r.p.z + r.p.tz * 6 + r.p.tx * (r.e.hw * 0.5); yaw = Math.atan2(r.p.tx, r.p.tz); } else { x = P.x + 5; z = P.z; } }
     if (g.inst && !g.inst.removed && !g.inst.dead) { VS.remove(g.inst); }
     const v = VS.spawn(g.type, x, z, yaw, { color: g.color, persistent: true }); v.upg = g.upg || (g.upg = {}); v.owned = g; g.inst = v; if (g.color !== v.color) this.paint(v, g.color);

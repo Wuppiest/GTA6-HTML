@@ -70,7 +70,7 @@ class NPCSystem {
       else n.pos.y = damp(n.pos.y, swim ? CFG.WATER_Y - 0.3 : gh, 14, dt);
       const hg = n.h.group; hg.position.copy(n.pos); hg.rotation.y = n.yaw;
       const far = camera.position.distanceToSquared(n.pos) > 85 * 85; hg.visible = !far;
-      if (!far) n.h.animate(dt, { speed: n.speed, aim: n.state === 'shoot' || n.state === 'combat', cower: n.state === 'cower', punch: n.punchT, swim, air: n.air, handsUp: n.state === 'arrest', phone: n.phone && n.state === 'idle' });
+      if (!far) n.h.animate(dt, { speed: n.speed, aim: n.state === 'shoot' || n.state === 'combat', cower: n.state === 'cower', punch: n.punchT, swim, air: n.air, handsUp: n.state === 'arrest' || n.state === 'surrender', phone: n.phone && n.state === 'idle' && !n.act, act: n.waveT > 0 ? 'wave' : n.state === 'idle' ? n.act : n.state === 'cheer' ? 'cheer' : null });
     }
   }
   updateDead(n, dt) {
@@ -90,8 +90,10 @@ class NPCSystem {
         const s = Math.sin(v.yaw), c = Math.cos(v.yaw), al = rx * s + rz * c, lat = -rx * c + rz * s;
         if (al > 0 && al < sp * 1.0 && Math.abs(lat) < 2.6 && Math.random() < 0.7) { n.state = 'dodge'; n.stateT = 0.45; const sg = lat >= 0 ? 1 : -1; n.vel.set(-c * sg * 7, 3, s * sg * 7); n.air = true; break; } }
       if (GS.playing && Player.aimTarget === n) n.panic(Player.active.pos, true);
-      if (Math.random() < dt * 0.025) { n.state = 'idle'; n.stateT = rand(4, 10); n.phone = Math.random() < 0.7; }
-    } else if (n.state === 'idle') { n.speed = 0; if (n.stateT <= 0) { n.state = 'walk'; n.phone = false; } if (GS.playing && Player.aimTarget === n) n.panic(Player.active.pos, true); }
+      if (Math.random() < dt * 0.025) { n.state = 'idle'; n.stateT = rand(4, 10); n.phone = Math.random() < 0.55; n.act = n.phone ? null : pick(['smoke', 'watch', 'stretch', 'think', 'shrug', null]); }
+    } else if (n.state === 'idle') { n.speed = 0; if (n.stateT <= 0) { n.state = 'walk'; n.phone = false; n.act = null; } if (GS.playing && Player.aimTarget === n) { if (n.kind === 'civ' && Math.random() < 0.6) { n.state = 'surrender'; n.stateT = rand(3, 6); } else n.panic(Player.active.pos, true); } }
+    else if (n.state === 'surrender') { n.speed = 0; n.yaw = turnToward(n.yaw, Math.atan2(Player.active.pos.x - n.pos.x, Player.active.pos.z - n.pos.z), dt * 4); if (n.stateT <= 0 || Player.aimTarget !== n && n.stateT < 1.5) n.panic(Player.active.pos, false); }
+    else if (n.state === 'cheer') { n.speed = 0; if (n.stateT <= 0) n.state = 'walk'; }
     else if (n.state === 'dodge') { n.pos.x += n.vel.x * dt; n.pos.z += n.vel.z * dt; n.speed = 0; if (n.stateT <= 0) n.panic(Player.active.pos, false); }
     else if (n.state === 'cower') { n.speed = 0; if (n.stateT <= 0) { n.state = 'flee'; n.stateT = rand(5, 9); } }
     else if (n.state === 'flee') { n.speed = 5.2; n.yaw = turnToward(n.yaw, n.fleeYaw, dt * 6); n.pos.x += Math.sin(n.yaw) * n.speed * dt; n.pos.z += Math.cos(n.yaw) * n.speed * dt;
@@ -280,6 +282,7 @@ const Player = {
       if ((In.rmb || In.hit('KeyX')) && v.missileT <= 0) { v.missileT = 1.2; Missiles.fire(v); } }
   },
   updateOnFoot(c, dt) {
+    if (Cable.ride) { c.h.group.position.copy(c.pos); c.h.group.rotation.y = Cable.yaw; c.h.animate(dt, { speed: 0 }); return; }
     const fx = -Math.sin(Cam.yaw), fz = -Math.cos(Cam.yaw), rx = Math.cos(Cam.yaw), rz = -Math.sin(Cam.yaw), ax = In.ax, ay = In.ay;
     let mx = fx * ay + rx * ax, mz = fz * ay + rz * ax; const ml = Math.min(1, Math.hypot(mx, mz)); if (ml > 0.01) { const l = Math.hypot(mx, mz); mx /= l; mz /= l; }
     if (Admin.noclip) { const sp = In.is('ShiftLeft') ? 60 : 18, up = (In.is('Space') ? 1 : 0) - (In.is('KeyC') ? 1 : 0); camera.getWorldDirection(tmpV3);
@@ -314,7 +317,7 @@ const Player = {
     c.inCover = false; if (c.crouch) c.inCover = World.query(c.pos.x - 1.3, c.pos.z - 1.3, c.pos.x + 1.3, c.pos.z + 1.3, _qb).some(b => b.top > c.pos.y + 1);
     CHUTE.visible = c.chute; if (c.chute) { CHUTE.position.copy(c.pos); CHUTE.rotation.y = c.yaw; }
     const sp = Math.hypot(c.vel.x, c.vel.z); c.h.group.position.copy(c.pos); c.h.group.rotation.y = c.yaw;
-    c.h.animate(dt, { speed: c.chute ? 0 : sp, aim: (c.aiming || c.lastShotT < 0.6) && !c.weapon.melee, aimPitch: c.aimPitch, crouch: c.crouch, swim: c.swim, air: !c.onGround && !c.swim && !c.chute, punch: c.punchT, handsUp: c.chute });
+    c.h.animate(dt, { speed: c.chute ? 0 : sp, aim: (c.aiming || c.lastShotT < 0.6) && !c.weapon.melee, aimPitch: c.aimPitch, crouch: c.crouch, swim: c.swim, air: !c.onGround && !c.swim && !c.chute, punch: c.punchT, handsUp: c.chute, act: c.act });
     if (c.swim) c.h.gun.visible = false; else c.h.setWeapon(c.weapon);
   },
   updateCombat(c, dt) {

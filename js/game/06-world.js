@@ -950,6 +950,9 @@ function buildMinimapImage() {
     g.beginPath(); B.pts.forEach(([x, z], k) => k ? g.lineTo(T(x), T(z)) : g.moveTo(T(x), T(z))); g.closePath(); g.fill(); }
   g.fillStyle = 'rgba(90,150,80,.8)'; for (const p of PARKS) { g.save(); g.translate(T(p.x), T(p.z)); g.rotate(-Math.atan2(p.s, p.c)); g.fillRect(-p.hx * s, -p.hz * s, p.hx * 2 * s, p.hz * 2 * s); g.restore(); }
   for (const f of FIELDS) { g.save(); g.translate(T(f.x), T(f.z)); g.rotate(-Math.atan2(f.s, f.c)); g.fillStyle = ['rgba(200,180,90,.6)', 'rgba(150,190,90,.6)', 'rgba(170,130,90,.6)', 'rgba(180,210,100,.6)', 'rgba(120,200,90,.75)', 'rgba(230,215,160,.9)'][f.type]; g.fillRect(-f.hx * s, -f.hz * s, f.hx * 2 * s, f.hz * 2 * s); g.restore(); }
+  // Wälder als dunkle Punkte, danach Zusatzflächen (Flugplatz, Pfade, Steinbruch)
+  for (const t of TREES) { if (t.t !== 'pine' && t.t !== 'tree' && t.t !== 'birch' && t.t !== 'willow') continue; g.fillStyle = t.t === 'pine' ? 'rgba(34,70,40,.55)' : 'rgba(50,95,45,.5)'; g.fillRect(T(t.x) - 1.2, T(t.z) - 1.2, 2.4, 2.4); }
+  for (const f of MAP_PAINT) f(g, T, s);
   for (const b of BLD) { g.save(); g.translate(T(b.x), T(b.z)); g.rotate(-b.yaw); const h = b.h || 6; g.fillStyle = b.lot ? '#6e7276' : h > 40 ? '#3a3f48' : h > 14 ? '#4c525a' : '#5c5a58'; g.fillRect(-b.w / 2 * s, -b.d / 2 * s, b.w * s, b.d * s); if (!b.lot && b.w * s > 3) { g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.6; g.strokeRect(-b.w / 2 * s, -b.d / 2 * s, b.w * s, b.d * s); } g.restore(); }
   g.lineCap = 'round'; g.lineJoin = 'round';
   for (const pass of [0, 1]) for (const e of Roads.edges) { g.strokeStyle = pass ? (e.type === 'highway' ? '#f0d890' : '#d8dce0') : '#22262a'; g.lineWidth = (e.hw * 2 + (pass ? 0 : 3)) * s; g.beginPath(); e.pts.forEach((p, k) => k ? g.lineTo(T(p.x), T(p.z)) : g.moveTo(T(p.x), T(p.z))); g.stroke(); }
@@ -957,7 +960,7 @@ function buildMinimapImage() {
 }
 function buildWorld() {
   makeWorldMaterials(); Signs.init();
-  buildRoadNetwork(); carveRoads(); buildParks(); buildSpecials(); buildBase(); buildCoast(); buildBlocks(); buildBuildings(); buildInfill(); buildRural(); buildRoadMeshes(); buildStreetFurniture(); Signals.build(); buildStunts(); buildVegetation(); buildTerrain();
+  buildRoadNetwork(); carveRoads(); buildParks(); buildSpecials(); buildBase(); buildCoast(); buildNature(); buildBlocks(); buildBuildings(); buildInfill(); buildRural(); buildRoadMeshes(); buildStreetFurniture(); Signals.build(); buildStunts(); buildNatureLate(); buildVegetation(); buildTerrain();
   flushParts(); Signs.flush(); flushNeon(); buildMinimapImage();
   console.log('Welt-Vertices:', VERTS, 'Gebäude:', BLD.length);
   LOC.kai = LOC.safehouse ? LOC.safehouse.clone() : V3(SUBURB.x, 5, SUBURB.z); LOC.elena = LOC.beach.clone();

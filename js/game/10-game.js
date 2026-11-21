@@ -517,7 +517,7 @@ const Game = {
       if (In.hit('F2')) AdminUI.toggle();
       if (In.hit('KeyK')) { if (BigMap.isOpen) BigMap.close(); else BigMap.open(); }
       if (In.hit('KeyM')) { if (GS.playing) this.openMissions(); else if (!$('missionMenu').classList.contains('hidden')) this.resume(); }
-      if (GS.playing && !GS.switching && !Admin.open) { if (In.hit('Tab')) Cam.startSwitch(); if (In.hit('KeyT')) Env.nextTime(); if (In.hit('KeyG')) Env.nextWeather(); }
+      if (GS.playing && !GS.switching && !Admin.open) { if (In.hit('KeyZ')) Cam.startSwitch(); if (In.hit('KeyT')) Env.nextTime(); if (In.hit('KeyG')) Env.nextWeather(); }
     }
     if (GS.state === STATES.WASTED || GS.state === STATES.BUSTED) { this.overT -= realDt; if (this.overT <= 0) this.respawn(); }
     const menu = GS.state === STATES.MENU, paused = GS.state === STATES.PAUSED || BigMap.isOpen; if (menu) { Env.time = MainMenu.menuTime; MainMenu.hideMarkers(); } const focus = menu ? tmpFocus.set(DOWNTOWN.x, 5, DOWNTOWN.z) : Player.targetPos();
@@ -531,7 +531,7 @@ const Game = {
       else Cam.update(realDt);
     }
     const pv = Player.vehicle;
-    if (pv && !pv.dead && Env.night > 0.3 && !menu && pv.cls !== 'heli') { const s = Math.sin(pv.yaw), c = Math.cos(pv.yaw); FX.head.position.set(pv.pos.x + s * pv.halfL, pv.pos.y + 0.9, pv.pos.z + c * pv.halfL); FX.head.target.position.set(pv.pos.x + s * 25, pv.pos.y - 1, pv.pos.z + c * 25); FX.head.intensity = 150 * Env.night; } else FX.head.intensity = 0;
+    const lm = pv ? pv.lightMode || 0 : 0; if (pv && !pv.dead && (lm === 1 || lm === 2 || (lm === 0 && Env.night > 0.3)) && !menu && pv.cls !== 'heli') { const s = Math.sin(pv.yaw), c = Math.cos(pv.yaw), far = lm === 2 ? 60 : 25; FX.head.position.set(pv.pos.x + s * pv.halfL, pv.pos.y + 0.9, pv.pos.z + c * pv.halfL); FX.head.target.position.set(pv.pos.x + s * far, pv.pos.y - (lm === 2 ? 0 : 1), pv.pos.z + c * far); FX.head.intensity = (lm === 2 ? 320 : 150) * Math.max(Env.night, 0.35); FX.head.distance = lm === 2 ? 140 : 70; } else FX.head.intensity = 0;
     if (Audio.ready) {
       const live = !menu && !paused;
       if (pv && live) { if (pv.cls === 'car') { const sp = pv.rpm / pv.spec.redline; Audio.updateEngine(!pv.dead, clamp(sp, 0, 1.1), pv.input.throttle || 0, pv.isBike ? 'bike' : pv.type); } else if (pv.boat) Audio.updateEngine(!pv.dead, Math.abs(pv.vF) / 25, pv.input.throttle || 0, 'boat'); else Audio.updateEngine(false, 0, 0, 'car'); Audio.updateAir(pv.air && !pv.dead ? pv.cls === 'heli' && !pv.spec.blimp ? 'heli' : pv.spec.prop ? 'prop' : 'jet' : null, pv.cls === 'heli' ? pv.rotorSpin : pv.thr, pv.boosting); }
