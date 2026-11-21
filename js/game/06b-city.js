@@ -20,7 +20,7 @@ const VegLOD = { S: 120, B: 800, nearR: 125, shadowR: 95, cells: new Map(), list
   cell(k) { let c = this.cells.get(k); if (!c) { const cx = Math.floor(k / 1000), cz = k % 1000; c = { x: -WS + (cx + 0.5) * this.S, z: -WS + (cz + 0.5) * this.S, near: [], far: [], on: false }; this.cells.set(k, c); this.list.push(c); } return c; },
   update(cam) { for (const c of this.list) { const d = Math.hypot(c.x - cam.x, c.z - cam.z), on = d < this.nearR, sh = d < this.shadowR; if (sh !== c.sh) { c.sh = sh; for (const m of c.near) m.castShadow = sh && m.userData.cast; } if (on === c.on) continue; c.on = on; for (const m of c.near) m.visible = on;
     for (const f of c.far) { const a = f.mesh.instanceMatrix; if (on) a.array.fill(0, f.start * 16, (f.start + f.count) * 16); else a.array.set(f.orig, f.start * 16); a.addUpdateRange(f.start * 16, f.count * 16); a.needsUpdate = true; } } } };
-const inPark = (x, z) => PARKS.some(p => { const dx = x - p.x, dz = z - p.z, lx = dx * p.c - dz * p.s, lz = dx * p.s + dz * p.c; return Math.abs(lx) < p.hx && Math.abs(lz) < p.hz; });
+const inPark = (x, z, m = 0) => PARKS.some(p => { const dx = x - p.x, dz = z - p.z, lx = dx * p.c - dz * p.s, lz = dx * p.s + dz * p.c; return Math.abs(lx) < p.hx + m && Math.abs(lz) < p.hz + m; });
 
 // ---------- WEITERE GEBÄUDETYPEN (lokal: Breite x, Tiefe z, Front = +z) ----------
 function towerH(L, base, amp, fall) { const dist = Math.hypot(L.x - DOWNTOWN.x, L.z - DOWNTOWN.z); return base + amp * Math.exp(-dist / fall) * sr(0.55, 1.2); }
@@ -97,7 +97,7 @@ function bVilla(F, w, d, L) { // moderne Villa mit Auskragung, Glasfront, Pool
   PB(F, ox, 0.4 + h1 + h2, oz, w * 0.92, 0.32, d * 0.82, acc, { mat: 'concrete' }); PB(F, -w * 0.48, 0.4, d / 2 - 0.3, 1.2, h1 + h2, 0.6, acc, { mat: 'planks' });
   railing(F, -w * 0.5, d / 2 - 0.1, w * 0.35, d / 2 - 0.1, 0.4 + h1, 1, '#c8d0d8', 1.2);
   const back = LP(F, 0, 0, -d / 2 - 4.5), fr = LP(F, 0, 0, d / 2 + 5.5);
-  if (det > 0 && rectFree(back.x, back.z, L.yaw || 0, w / 2, 3.8, 0.8)) { PB(F, 0, 0, -d / 2 - 4.5, w, 0.4, 7, '#f0ece4', { mat: 'plaza' }); part(F, G.box(), 0, 0.36, -d / 2 - 4.5, w * 0.7, 0.06, 4.6, '#ffffff', { mat: 'pool' }); for (const sx of [-w * 0.42, w * 0.42]) PB(F, sx, 0.4, -d / 2 - 3, 0.8, 0.3, 1.9, '#ffffff'); }
+  if (det > 0 && rectFree(back.x, back.z, L.yaw || 0, w / 2, 3.8, 0.8)) { deckFlat(F, L, -d / 2 - 4.5, w / 2, 3.5); PB(F, 0, 0, -d / 2 - 4.5, w, 0.4, 7, '#f0ece4', { mat: 'plaza' }); part(F, G.box(), 0, 0.36, -d / 2 - 4.5, w * 0.7, 0.06, 4.6, '#ffffff', { mat: 'pool' }); for (const sx of [-w * 0.42, w * 0.42]) PB(F, sx, 0.4, -d / 2 - 3, 0.8, 0.3, 1.9, '#ffffff'); }
   for (const sx of [-1, 1]) { const q = LP(F, sx * (w / 2 + 2), 0, -d / 2 - 2); TREES.push({ t: 'palm', x: q.x, z: q.z, s: sr(0.9, 1.2) }); }
   if (rectFree(fr.x, fr.z, L.yaw || 0, w / 2 + 1, 0.6, 1.2)) { PB(F, -2.2, 0, d / 2 + 5.5, w, 1.4, 0.35, wall, { mat: 'plaster' }); PB(F, w / 2 - 1.2, 0, d / 2 + 5.5, 3.6, 1.6, 0.12, '#2a2c30', { mat: 'metal' }); { const q = LP(F, -2.2, 0, d / 2 + 5.5); World.addOBB(q.x, q.z, w / 2, 0.2, L.yaw || 0, L.y + 1.4, L.y - 1, 'prop'); }
     if (srand() < 0.35 && det > 0) propCar(F, w / 2 - 1.5, d / 2 + 2.6, Math.PI / 2, spick(PAL.car)); }
@@ -223,7 +223,8 @@ function buildInfill() {
 function makePark(cx, cz, yaw, hx, hz, o = {}) {
   for (let k = 0; k < 5 && !rectFree(cx, cz, yaw, hx, hz, 1.5); k++) { hx *= 0.8; hz *= 0.8; } if (hx < 8 || hz < 8 || !rectFree(cx, cz, yaw, hx, hz, 1.5)) return;
   PARKS.push({ x: cx, z: cz, c: Math.cos(yaw), s: Math.sin(yaw), hx, hz }); World.addOBB(cx, cz, hx, hz, yaw, -100, -50, 'reserve');
-  const y = terrainHeight(cx, cz), F = FR(cx, y, cz, yaw);
+  let y = 0, n = 0; for (let u = -1; u <= 1; u += 0.5) for (let v = -1; v <= 1; v += 0.5) { y += terrainHeight(cx + u * hx * Math.cos(yaw) + v * hz * Math.sin(yaw), cz - u * hx * Math.sin(yaw) + v * hz * Math.cos(yaw)); n++; } y /= n; // mittlere Höhe → kleinste Böschungen
+  const F = FR(cx, y, cz, yaw); flattenRect(cx, cz, hx, hz, yaw, y + 0.05, 7, 16); // ebener Park: Wege & Brunnen liegen auf dem Boden
   // Wege: Rundweg + Diagonalen
   for (const [w, d, x, z] of [[hx * 2 - 6, 3, 0, hz - 6], [hx * 2 - 6, 3, 0, -hz + 6], [3, hz * 2 - 6, hx - 6, 0], [3, hz * 2 - 6, -hx + 6, 0], [3, hz * 2 - 10, 0, 0], [hx * 2 - 10, 3, 0, 0]]) PB(F, x, -0.85, z, w, 1.0, d, '#d8ccb4', { mat: 'plaza', keep: true });
   // Brunnen / Teich
@@ -239,7 +240,7 @@ function buildParks() {
   // Bayfront-/Zentralpark im Superblock von Downtown
   if (LOC.cbdPark) { const c = Math.cos(0.1), s = Math.sin(0.1), lu = -134 - (-141), lv = -88 - (-103), p = LOC.cbdPark; makePark(p.x + lu * c - lv * s, p.z + lu * s + lv * c, -0.1, 76, 78, { pond: true, trees: 70, name: 'SOLARA PARK' }); }
   // Plaza im Kreisverkehr der Altstadt
-  { const O = LOC.oldPlaza, y = terrainHeight(O.x, O.z), F = FR(O.x, y, O.z, 0); PC(F, 0, -0.8, 0, 15, 1.0, '#e6d6bc', { seg: 24, mat: 'plaza' }); PC(F, 0, 0.0, 0, 4.4, 0.7, '#f4f0e8', { seg: 18 }); part(F, G.cyl(18), 0, 0.6, 0, 8, 0.12, 8, '#3fc8e8', { mat: 'pool' }); PC(F, 0, 0, 0, 0.5, 4.5, '#e8e0d0', { seg: 10 }); PS(F, 0, 5.2, 0, 0.9, '#c8b890');
+  { const O = LOC.oldPlaza, y = terrainHeight(O.x, O.z), F = FR(O.x, y, O.z, 0); flattenRect(O.x, O.z, 15, 15, 0, y, 7, 10); PC(F, 0, -0.8, 0, 15, 1.0, '#e6d6bc', { seg: 24, mat: 'plaza' }); PC(F, 0, 0.0, 0, 4.4, 0.7, '#f4f0e8', { seg: 18 }); part(F, G.cyl(18), 0, 0.6, 0, 8, 0.12, 8, '#3fc8e8', { mat: 'pool' }); PC(F, 0, 0, 0, 0.5, 4.5, '#e8e0d0', { seg: 10 }); PS(F, 0, 5.2, 0, 0.9, '#c8b890');
     for (let a = 0; a < 6; a++) TREES.push({ t: 'palm', x: O.x + Math.cos(a) * 11, z: O.z + Math.sin(a) * 11, s: 0.9 }); World.addOBB(O.x, O.z, 4.5, 4.5, 0, y + 5); }
   // Parks in den Vorstädten (Spielplatz, Bäume)
   for (const P of [SUBURB2, SUBURB]) { const r = Roads.nearest(P.x, P.z, 200); const off = r && r.d < 40 ? 45 : 0; makePark(P.x + off, P.z, 0.2, 30, 26, { trees: 22, name: P === SUBURB2 ? 'KENDALL PARK' : 'PALM PARK' }); }
@@ -424,12 +425,12 @@ function hMission(F, w, d) { // spanischer Stil: heller Putz, Ziegel-Satteldach,
   for (const sx of [-1, 1]) { const q = LP(F, sx * (w / 2 + 1.6), 0, d / 2 + 2); TREES.push({ t: 'palm', x: q.x, z: q.z, s: sr(0.8, 1.05) }); }
   mailbox(F, -w / 2 + 0.6, d / 2 + 4.6); return { top: 0.3 + h + 2.0, flat: false };
 }
-function hModern(F, w, d) { // moderner Kubus: Flachdach, große Fenster, Holzverkleidung
+function hModern(F, w, d, L) { // moderner Kubus: Flachdach, große Fenster, Holzverkleidung
   const c1 = spick(['#f4f4f2', '#e2e2e0', '#3a3c40', '#d8d4cc']), wood = '#ffffff';
   PB(F, 0, -1.5, 0, w + 0.5, 1.8, d + 0.5, '#bdb3a2', { mat: 'concrete' }); PB(F, -w * 0.15, 0.3, 0, w * 0.7, 3.2, d, c1, { mat: 'plaster' }); PB(F, w * 0.35, 0.3, -d * 0.1, w * 0.3, 3.2, d * 0.8, wood, { mat: 'planks' });
   PB(F, w * 0.08, 3.5, -d * 0.08, w * 0.75, 2.9, d * 0.8, c1, { mat: 'plaster' }); PB(F, w * 0.08, 6.4, -d * 0.08, w * 0.8, 0.25, d * 0.85, '#2a2c30', { mat: 'metal' }); PB(F, -w * 0.15, 3.5, 0, w * 0.72, 0.18, d + 0.2, '#2a2c30', { mat: 'metal' });
   WIN_STYLE = 1; PW(F, -w * 0.15, 1.8, d / 2 + 0.05, w * 0.55, 2.4, 0, litCol() || 0xffe8c0, 1); PW(F, w * 0.08, 4.9, d * 0.32 + 0.05, w * 0.6, 2.0, 0, litCol(), 1);
-  houseDoor(F, w * 0.35, d / 2, '#2a2c30'); if (Q().detail > 0 && srand() < 0.5) { PB(F, 0, 0, -d / 2 - 4, w, 0.35, 5, '#e8e4dc', { mat: 'plaza' }); part(F, G.box(), 0, 0.31, -d / 2 - 4, w * 0.75, 0.06, 3.6, '#ffffff', { mat: 'pool' }); }
+  houseDoor(F, w * 0.35, d / 2, '#2a2c30'); if (Q().detail > 0 && srand() < 0.5) { deckFlat(F, L, -d / 2 - 4, w / 2, 2.5); PB(F, 0, 0, -d / 2 - 4, w, 0.35, 5, '#e8e4dc', { mat: 'plaza' }); part(F, G.box(), 0, 0.31, -d / 2 - 4, w * 0.75, 0.06, 3.6, '#ffffff', { mat: 'pool' }); }
   mailbox(F, -w / 2 + 0.6, d / 2 + 4.6); return { top: 6.65, flat: true };
 }
 function hColonial(F, w, d) { // zweigeschossig, Holzfassade, Säulenveranda, Satteldach
@@ -455,5 +456,5 @@ function bHouse(F, w, d, L, o = {}) {
   const zn = L && L.x !== undefined ? zoneAt(L.x, L.z) : 'suburb', r = srand();
   const style = zn === 'rural' || zn === 'mountain' ? (r < 0.35 ? 'ranch' : r < 0.6 ? 'bungalow' : r < 0.75 ? 'colonial' : 'classic')
     : zn === 'heights' ? (r < 0.5 ? 'modern' : r < 0.8 ? 'mission' : 'classic') : (r < 0.3 ? 'classic' : r < 0.47 ? 'mission' : r < 0.62 ? 'ranch' : r < 0.75 ? 'modern' : r < 0.88 ? 'colonial' : 'bungalow');
-  return style === 'ranch' ? hRanch(F, w, d) : style === 'mission' ? hMission(F, w, d) : style === 'modern' ? hModern(F, w, d) : style === 'colonial' ? hColonial(F, w, d) : style === 'bungalow' ? hBungalow(F, w, d) : bHouseClassic(F, w, d, L, o);
+  return style === 'ranch' ? hRanch(F, w, d) : style === 'mission' ? hMission(F, w, d) : style === 'modern' ? hModern(F, w, d, L) : style === 'colonial' ? hColonial(F, w, d) : style === 'bungalow' ? hBungalow(F, w, d) : bHouseClassic(F, w, d, L, o);
 }

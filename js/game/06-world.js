@@ -356,7 +356,7 @@ function bHouseClassic(F, w, d, L, o = {}) {
   if (det > 0) { PB(F, -w / 2 - 1.5, 0, 0, 0.8, 1.1, d + 4, '#3f6a32'); PB(F, 0, 0, -d / 2 - 1.8, w + 3, 1.1, 0.8, '#3f6a32'); }
   PB(F, -w / 2 + 0.8, 0, d / 2 + 4.6, 0.12, 1.1, 0.12, '#666', { mat: 'metal' }); PB(F, -w / 2 + 0.8, 1.1, d / 2 + 4.6, 0.35, 0.3, 0.55, spick(['#2a5aa0', '#ffffff', '#c0392b']), { mat: 'metal' });
   acUnit(F, -w / 2 - 0.5, 0.3, -d * 0.2, Math.PI / 2);
-  if (srand() < 0.45 && det > 0) { PB(F, 0, 0.0, -d / 2 - 5, 9, 0.35, 5.5, '#f4f0e8', { mat: 'plaza' }); part(F, G.box(), 0, 0.31, -d / 2 - 5, 8, 0.06, 4.5, '#ffffff', { mat: 'pool' }); for (const sx of [-2.5, 2.5]) PB(F, sx, 0.35, -d / 2 - 1.8, 0.8, 0.3, 1.9, '#ffffff'); }
+  if (srand() < 0.45 && det > 0) { deckFlat(F, L, -d / 2 - 5, 4.5, 2.75); PB(F, 0, 0.0, -d / 2 - 5, 9, 0.35, 5.5, '#f4f0e8', { mat: 'plaza' }); part(F, G.box(), 0, 0.31, -d / 2 - 5, 8, 0.06, 4.5, '#ffffff', { mat: 'pool' }); for (const sx of [-2.5, 2.5]) PB(F, sx, 0.35, -d / 2 - 1.8, 0.8, 0.3, 1.9, '#ffffff'); }
   if (srand() < 0.25 && det > 0 && !o.noCar) propCar(F, gx, d / 2 + 4.2, Math.PI, spick(PAL.car));
   return { top: 0.3 + h, flat: false };
 }
@@ -434,8 +434,10 @@ function flattenRect(cx, cz, hx, hz, yaw, y, pad = 4, fall = 8) {
     const ex = Math.max(0, Math.abs(lx) - hx - pad), ez = Math.max(0, Math.abs(lz) - hz - pad), w = 1 - sstep(0, fall, Math.hypot(ex, ez)); if (w <= 0) continue;
     const r = Roads.nearest(x, z, 30); if (r && r.d < r.e.hw + 3.8) continue; const k = j * GN + i; HGT[k] = lerp(HGT[k], y, w); }
 }
+// Terrasse/Pool hinter dem Haus: Gelände dort ebenfalls ebnen, damit nichts schwebt oder versinkt
+function deckFlat(F, L, lz, hw, hd) { if (!L) return; const q = LP(F, 0, 0, lz); flattenRect(q.x, q.z, hw, hd, L.yaw || 0, L.y + 0.08, 4, 9); }
 function placeBuilding(L, fn, opts) {
-  flattenRect(L.x, L.z, L.w / 2, L.d / 2, L.yaw, L.y + 0.08, fn === bHouse ? 7 : 3, 7);
+  flattenRect(L.x, L.z, L.w / 2, L.d / 2, L.yaw, L.y + 0.08, 7, 9); // Rand ≥ eine Gitterzelle: Terrassen, Pools & Vorplätze liegen bündig
   const F = FR(L.x, L.y, L.z, L.yaw); const r = fn(F, L.w, L.d, L, opts) || { top: 6 }; L.top = r.top;
   const dd = r.obbD || r.depthUsed || L.d, ww = r.obbW || L.w, oz = r.depthUsed ? -(L.d - dd) / 2 : 0, cx = L.x + Math.sin(L.yaw) * oz, cz = L.z + Math.cos(L.yaw) * oz;
   World.addOBB(cx, cz, ww / 2, dd / 2, L.yaw, L.y + r.top, L.y - 3, 'building'); if (r.flat) World.addRoof(cx, cz, ww / 2, dd / 2, L.yaw, L.y + r.top);
@@ -670,7 +672,7 @@ function parkCraft() {
   const mp = LOC.marina; put('seaplane', waterSpot(mp.x + 40, mp.z + 100, 0, 70, 2.2), '#ff7a1a');
   const q = LOC.quay; if (q) { put('tug', waterSpot(q.x + 140, q.z + 32, 0, 70, 3.5)); put('tug', waterSpot(q.x - 140, q.z + 32, 0, 70, 3.5), '#1d2b4a'); }
   if (LOC.swamp) { const sw = LOC.swamp, a = waterSpot(sw.x, sw.z, 6, 220, 0.25) || { x: sw.x + 10, z: sw.z + 10, yaw: 0 }; put('airboat', a); put('airboat', waterSpot(a.x, a.z, 8, 120, 0.25, [a]) || { x: sw.x - 12, z: sw.z + 14, yaw: 1 }, '#3a5a7a');
-    const F = FR(sw.x, terrainHeight(sw.x, sw.z), sw.z, Math.atan2(a.x - sw.x, a.z - sw.z)); PB(F, 0, -0.3, 0, 3.6, 0.5, 5, '#7a6a52'); Signs.quad(F, 0, 1.6, 2.6, 3.2, 0.7, 0, Signs.cell('GATOR TOURS', '#2f5a2a', '#ffe08a')); PB(F, -1.4, -0.3, 2.5, 0.15, 2.2, 0.15, '#5a4a3a'); PB(F, 1.4, -0.3, 2.5, 0.15, 2.2, 0.15, '#5a4a3a'); }
+    const dk = V3(lerp(sw.x, a.x, 0.6), 0, lerp(sw.z, a.z, 0.6)); if (Roads.nearest(dk.x, dk.z, 9)) { dk.x = a.x - Math.sin(a.yaw) * 6; dk.z = a.z - Math.cos(a.yaw) * 6; } const F = FR(dk.x, terrainHeight(dk.x, dk.z), dk.z, Math.atan2(a.x - dk.x, a.z - dk.z)); PB(F, 0, -0.3, 0, 3.6, 0.5, 5, '#7a6a52'); Signs.quad(F, 0, 1.6, 2.6, 3.2, 0.7, 0, Signs.cell('GATOR TOURS', '#2f5a2a', '#ffe08a')); PB(F, -1.4, -0.3, 2.5, 0.15, 2.2, 0.15, '#5a4a3a'); PB(F, 1.4, -0.3, 2.5, 0.15, 2.2, 0.15, '#5a4a3a'); }
   const b = LOC.beach; if (b) { const j1 = put('jetski', waterSpot(b.x, b.z, 30, 140, 1.2), '#ff2d95'); if (j1) { const j2 = put('jetski', waterSpot(j1.x, j1.z, 10, 60, 1.2, [j1]), '#ffe23a'); put('dinghy', waterSpot(j1.x, j1.z, 20, 90, 1.0, [j1, j2].filter(Boolean))); } }
   const lh = LOC.lighthouse; if (lh) { const d = put('dinghy', waterSpot(lh.x, lh.z, 35, 160, 1.4), '#d81e2a'); if (d) put('sailboat', waterSpot(d.x, d.z, 20, 120, 2.6, [d]), '#2a6f97'); }
 }
