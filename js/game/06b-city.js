@@ -96,10 +96,11 @@ function bVilla(F, w, d, L) { // moderne Villa mit Auskragung, Glasfront, Pool
   const ox = w * 0.1, oz = -d * 0.1; PB(F, ox, 0.4 + h1, oz, w * 0.85, h2, d * 0.75, wall, { mat: 'plaster' }); PW(F, ox, 0.4 + h1 + h2 / 2, oz + d * 0.375 + 0.05, w * 0.6, h2 - 0.9, 0, litCol() || 0xffe0b0, 1);
   PB(F, ox, 0.4 + h1 + h2, oz, w * 0.92, 0.32, d * 0.82, acc, { mat: 'concrete' }); PB(F, -w * 0.48, 0.4, d / 2 - 0.3, 1.2, h1 + h2, 0.6, acc, { mat: 'planks' });
   railing(F, -w * 0.5, d / 2 - 0.1, w * 0.35, d / 2 - 0.1, 0.4 + h1, 1, '#c8d0d8', 1.2);
-  if (det > 0) { PB(F, 0, 0, -d / 2 - 4.5, w, 0.4, 7, '#f0ece4', { mat: 'plaza' }); part(F, G.box(), 0, 0.36, -d / 2 - 4.5, w * 0.7, 0.06, 4.6, '#ffffff', { mat: 'pool' }); for (const sx of [-w * 0.42, w * 0.42]) PB(F, sx, 0.4, -d / 2 - 3, 0.8, 0.3, 1.9, '#ffffff'); }
+  const back = LP(F, 0, 0, -d / 2 - 4.5), fr = LP(F, 0, 0, d / 2 + 5.5);
+  if (det > 0 && rectFree(back.x, back.z, L.yaw || 0, w / 2, 3.8, 0.8)) { PB(F, 0, 0, -d / 2 - 4.5, w, 0.4, 7, '#f0ece4', { mat: 'plaza' }); part(F, G.box(), 0, 0.36, -d / 2 - 4.5, w * 0.7, 0.06, 4.6, '#ffffff', { mat: 'pool' }); for (const sx of [-w * 0.42, w * 0.42]) PB(F, sx, 0.4, -d / 2 - 3, 0.8, 0.3, 1.9, '#ffffff'); }
   for (const sx of [-1, 1]) { const q = LP(F, sx * (w / 2 + 2), 0, -d / 2 - 2); TREES.push({ t: 'palm', x: q.x, z: q.z, s: sr(0.9, 1.2) }); }
-  PB(F, -2.2, 0, d / 2 + 5.5, w, 1.4, 0.35, wall, { mat: 'plaster' }); PB(F, w / 2 - 1.2, 0, d / 2 + 5.5, 3.6, 1.6, 0.12, '#2a2c30', { mat: 'metal' });
-  if (srand() < 0.35 && det > 0) propCar(F, w / 2 - 1.5, d / 2 + 2.6, Math.PI / 2, spick(PAL.car));
+  if (rectFree(fr.x, fr.z, L.yaw || 0, w / 2 + 1, 0.6, 1.2)) { PB(F, -2.2, 0, d / 2 + 5.5, w, 1.4, 0.35, wall, { mat: 'plaster' }); PB(F, w / 2 - 1.2, 0, d / 2 + 5.5, 3.6, 1.6, 0.12, '#2a2c30', { mat: 'metal' }); { const q = LP(F, -2.2, 0, d / 2 + 5.5); World.addOBB(q.x, q.z, w / 2, 0.2, L.yaw || 0, L.y + 1.4, L.y - 1, 'prop'); }
+    if (srand() < 0.35 && det > 0) propCar(F, w / 2 - 1.5, d / 2 + 2.6, Math.PI / 2, spick(PAL.car)); }
   return { top: 0.4 + h1 + h2 + 0.32, flat: true };
 }
 function bStripMall(F, w, d, L) { // eingeschossige Ladenzeile mit Parkplatz davor
@@ -116,9 +117,9 @@ function bFactory(F, w, d, L) {
   const H = sr(8, 12), c = spick(PAL.ind), n = Math.max(2, Math.round(w / 9)), det = Q().detail;
   PB(F, 0, -1.5, 0, w + 0.4, 1.8, d + 0.4, '#8a8a84', { mat: 'concrete' }); PB(F, 0, 0.3, 0, w, H, d, c, { mat: srand() < 0.4 ? 'brick' : 'steel' });
   for (let i = 0; i < n; i++) part(F, G.gable(), -w / 2 + (i + 0.5) * w / n, 0.3 + H, 0, w / n, 3, d, '#9aa0a8', { mat: 'steel' });
-  const ch = sri(1, 3); for (let k = 0; k < ch; k++) { const x = -w / 2 + 3 + k * 4.5, h = H + sr(10, 24); PC(F, x, 0.3, -d / 2 - 2.5, 1.2, h, spick(['#a8a090', '#8a3a2a', '#c8c0b0']), { seg: 10, mat: 'brick', keep: true }); PC(F, x, h, -d / 2 - 2.5, 1.35, 1, '#3a3a3a', { seg: 10, keep: true }); const q = LP(F, x, 0, -d / 2 - 2.5); World.addOBB(q.x, q.z, 1.3, 1.3, 0, q.y + h); }
-  for (let k = 0; k < 2; k++) { PC(F, w / 2 + 4, 0.3, -d / 4 + k * 7, 2.8, 7, '#d8d8d0', { seg: 12, mat: 'metal' }); const q = LP(F, w / 2 + 4, 0, -d / 4 + k * 7); World.addOBB(q.x, q.z, 2.8, 2.8, 0, q.y + 7.3); }
-  if (det > 0) { PB(F, w / 2 + 1.5, 5.5, 0, 3.2, 0.5, 0.5, '#8a8e94', { mat: 'metal' }); PB(F, w / 2 + 1.5, 5.5, 3.5, 3.2, 0.5, 0.5, '#8a8e94', { mat: 'metal' }); }
+  const ch = sri(1, 3); for (let k = 0; k < ch; k++) { const x = -w / 2 + 3 + k * 4.5, h = H + sr(10, 24); { const q0 = LP(F, x, 0, -d / 2 - 2.5); if (!offRoad(q0.x, q0.z, 2)) continue; } PC(F, x, 0.3, -d / 2 - 2.5, 1.2, h, spick(['#a8a090', '#8a3a2a', '#c8c0b0']), { seg: 10, mat: 'brick', keep: true }); PC(F, x, h, -d / 2 - 2.5, 1.35, 1, '#3a3a3a', { seg: 10, keep: true }); const q = LP(F, x, 0, -d / 2 - 2.5); World.addOBB(q.x, q.z, 1.3, 1.3, 0, q.y + h); }
+  for (let k = 0; k < 2; k++) { { const q0 = LP(F, w / 2 + 4, 0, -d / 4 + k * 7); if (!offRoad(q0.x, q0.z, 3.2)) continue; } PC(F, w / 2 + 4, 0.3, -d / 4 + k * 7, 2.8, 7, '#d8d8d0', { seg: 12, mat: 'metal' }); const q = LP(F, w / 2 + 4, 0, -d / 4 + k * 7); World.addOBB(q.x, q.z, 2.8, 2.8, 0, q.y + 7.3); }
+  if (det > 0 && offRoad(LP(F, w / 2 + 3, 0, 0).x, LP(F, w / 2 + 3, 0, 0).z, 1)) { PB(F, w / 2 + 1.5, 5.5, 0, 3.2, 0.5, 0.5, '#8a8e94', { mat: 'metal' }); PB(F, w / 2 + 1.5, 5.5, 3.5, 3.2, 0.5, 0.5, '#8a8e94', { mat: 'metal' }); }
   facade(F, w, d, 0.3, 1, H, { only: [0], sp: 6, ww: 4, wh: 1.4, style: 1, sill: false }); PB(F, 0, 0.3, d / 2 + 0.1, 5, 5, 0.12, '#e0e0dc', { mat: 'steel' });
   Signs.quad(F, 0, H - 1.6, d / 2 + 0.12, Math.min(w * 0.6, 16), 1.4, 0, Signs.cell(spick(['SOLARA STEEL', 'CEMENTOS', 'GULF PLASTICS', 'SUNPOWER', 'BREWERY', 'RECYCLING', 'RUST FLATS']), '#1a2a3a', '#ffd23a', 2));
   return { top: 0.3 + H + 3, flat: false };
@@ -220,6 +221,7 @@ function buildInfill() {
 
 // ---------- PARKS ----------
 function makePark(cx, cz, yaw, hx, hz, o = {}) {
+  for (let k = 0; k < 5 && !rectFree(cx, cz, yaw, hx, hz, 1.5); k++) { hx *= 0.8; hz *= 0.8; } if (hx < 8 || hz < 8 || !rectFree(cx, cz, yaw, hx, hz, 1.5)) return;
   PARKS.push({ x: cx, z: cz, c: Math.cos(yaw), s: Math.sin(yaw), hx, hz }); World.addOBB(cx, cz, hx, hz, yaw, -100, -50, 'reserve');
   const y = terrainHeight(cx, cz), F = FR(cx, y, cz, yaw);
   // Wege: Rundweg + Diagonalen
@@ -252,14 +254,13 @@ function farmAt(x, z, yaw, big) { // Bauernhof: Haus, Scheune, Silo, Felder, Zä
   const F = FR(L.x, L.y, L.z, L.yaw), bx = 15; PB(F, bx, -1, 0, 12, 7.5, 16, '#a8342a'); part(F, G.gable(), bx, 6.5, 0, 12.8, 4.5, 16.8, '#5a4a40'); PB(F, bx, -0.5, 8.02, 5, 5, 0.1, '#f4f0e8'); seg(...LP(F, bx - 2.5, 0, 8.1).toArray(), ...LP(F, bx + 2.5, 5, 8.1).toArray(), 0.2, 0.2, '#f4f0e8');
   const q = LP(F, bx, 0, 0); World.addOBB(q.x, q.z, 6, 8, L.yaw, L.y + 9); BLD.push({ x: q.x, z: q.z, w: 12, d: 16, yaw: L.yaw, h: 9 });
   for (let k = 0; k < (big ? 2 : 1); k++) { PC(F, -12 - k * 6, -1, -6, 2.6, 13, '#c8ccd0', { seg: 12, mat: 'steel' }); part(F, G.hsph(12), -12 - k * 6, 12, -6, 5.4, 4, 5.4, '#9aa0a8', { mat: 'steel' }); const s2 = LP(F, -12 - k * 6, 0, -6); World.addOBB(s2.x, s2.z, 2.6, 2.6, 0, L.y + 14); }
-  for (let k = 0; k < 6; k++) { const hp = LP(F, sr(-18, 20), 0, sr(10, 16)); PC(FR(hp.x, terrainHeight(hp.x, hp.z), hp.z, 0), 0, 0, 0, 0.75, 1.2, '#d8c070', { seg: 10, rx: Math.PI / 2 }); }
+  for (let k = 0; k < 6; k++) { const hp = LP(F, sr(-18, 20), 0, sr(10, 16)); if (!offRoad(hp.x, hp.z, 1.5)) continue; const hy = terrainHeight(hp.x, hp.z); PC(FR(hp.x, hy, hp.z, 0), 0, 0, 0, 0.75, 1.2, '#d8c070', { seg: 10, rx: Math.PI / 2 }); World.addOBB(hp.x, hp.z, 0.75, 0.6, 0, hy + 1.5, hy - 1, 'prop'); }
   const nf = big ? 4 : 3; for (let i = 0; i < nf; i++) { const a = yaw + Math.PI / 2 * i + sr(-0.2, 0.2), dd = sr(70, 95), fx = L.x + Math.cos(a) * dd, fz = L.z + Math.sin(a) * dd; if (zoneAt(fx, fz) !== 'rural' || Roads.nearest(fx, fz, 30)) continue; const fhx = sr(28, 46), fhz = sr(26, 42);
     if ([[1, 1], [-1, 1], [1, -1], [-1, -1], [0, 0]].some(([a, b]) => terrainHeight(fx + a * fhx, fz + b * fhz) < 2.2 || inLake(fx + a * fhx, fz + b * fhz))) continue;
     FIELDS.push({ x: fx, z: fz, hx: fhx, hz: fhz, c: Math.cos(yaw), s: Math.sin(yaw), type: sri(0, 3) }); }
   if ((FARM_TRACTORS = (typeof FARM_TRACTORS === 'number' ? FARM_TRACTORS : 0) + 1) <= 7) { const tp = LP(F, bx + 1, 0, 12.5); PARKED.push(['tractor', tp.x, tp.z, L.yaw + 0.3]); }
   // Weidezaun ums Gehöft
-  const hx = 34, hz = 22; for (const [x0, z0, x1, z1] of [[-hx, -hz, hx, -hz], [-hx, hz, -8, hz], [8, hz, hx, hz], [-hx, -hz, -hx, hz], [hx, -hz, hx, hz]]) { const n = Math.max(1, Math.round(Math.hypot(x1 - x0, z1 - z0) / 3)); for (let k = 0; k <= n; k++) { const p = LP(F, lerp(x0, x1, k / n), 0, lerp(z0, z1, k / n)); PB(null, p.x, terrainHeight(p.x, p.z) - 0.2, p.z, 0.12, 1.4, 0.12, '#8a6a4a'); }
-    const a = LP(F, x0, 0, z0), b = LP(F, x1, 0, z1); for (const yy of [0.7, 1.1]) seg(a.x, terrainHeight(a.x, a.z) + yy, a.z, b.x, terrainHeight(b.x, b.z) + yy, b.z, 0.06, 0.06, '#9a7a5a'); }
+  const hx = 34, hz = 22; for (const [x0, z0, x1, z1] of [[-hx, -hz, hx, -hz], [-hx, hz, -8, hz], [8, hz, hx, hz], [-hx, -hz, -hx, hz], [hx, -hz, hx, hz]]) { const a = LP(F, x0, 0, z0), b = LP(F, x1, 0, z1); fenceLine(a.x, a.z, b.x, b.z, 3, 1.2, '#8a6a4a', '#9a7a5a', [0.7, 1.1]); }
   return true;
 }
 function trailerPark(cx, cz) { const r = Roads.nearest(cx, cz, 200, e => e.type !== 'highway'); if (!r) return; const yaw = Math.atan2(r.p.tx, r.p.tz); let n = 0;
@@ -274,7 +275,7 @@ function golfCourse(cx, cz, R) { // Golfplatz: gemähte Bahnen, Bunker, Fahnen, 
   LOC.golf = V3(cx, 0, cz);
 }
 function solarFarm(cx, cz, yaw) { const y0 = terrainHeight(cx, cz); for (let i = -5; i <= 5; i++) for (let j = -3; j <= 3; j++) { const lx = i * 9, lz = j * 7, x = cx + lx * Math.cos(yaw) + lz * Math.sin(yaw), z = cz - lx * Math.sin(yaw) + lz * Math.cos(yaw), y = terrainHeight(x, z);
-    if (Math.abs(y - y0) > 4 || Roads.nearest(x, z, 12)) continue; const F = FR(x, y, z, yaw); PB(F, 0, -0.3, 0, 0.2, 1.4, 0.2, '#8a8e94', { mat: 'metal' }); part(F, G.box(), 0, 1.0, 0, 8, 0.12, 3.4, '#1a2a4a', { rx: -0.45, mat: 'shiny' }); } }
+    if (Math.abs(y - y0) > 4 || !rectFree(x, z, yaw, 4.5, 2, 1.5)) continue; World.addOBB(x, z, 4, 1.6, yaw, y + 1.6, y - 1, 'prop'); const F = FR(x, y, z, yaw); PB(F, 0, -0.3, 0, 0.2, 1.4, 0.2, '#8a8e94', { mat: 'metal' }); part(F, G.box(), 0, 1.0, 0, 8, 0.12, 3.4, '#1a2a4a', { rx: -0.45, mat: 'shiny' }); } }
 function windFarm(list) {
   for (const [wx, wz] of list) { const wy = terrainHeight(wx, wz); if (wy < 5 || Roads.nearest(wx, wz, 20)) continue; PC(FR(0, 0, 0, 0), wx, wy - 1, wz, 1.2, 46, '#f4f4f4', { seg: 10, keep: true }); PS(FR(0, 0, 0, 0), wx, wy + 45, wz, 1.6, '#f4f4f4', { sx: 1, sy: 1, sz: 2.4, keep: true });
     const rot = new THREE.Group(); rot.position.set(wx, wy + 46, wz + 2.6); const bl = []; for (let k = 0; k < 3; k++) { const b = new THREE.BoxGeometry(1.2, 18, 0.3); b.translate(0, 9, 0); b.rotateZ(k * Math.PI * 2 / 3); bl.push(nonIdx(b)); }
@@ -400,14 +401,14 @@ function buildBlocks() {
 
 // ---------- HAUSSTILE (Vorstadt, Land, Dörfer) ----------
 function houseDoor(F, x, z, c) { PB(F, x, 0.3, z + 0.02, 1.1, 2.2, 0.12, c || spick(['#7a4a2a', '#2a4a6a', '#ffffff', '#a03a2a', '#3a5a3a'])); PG(F, x + 0.85, 2.0, z + 0.1, 0.16, 0.22, 0.1, '#ffd9a0'); PB(F, x, 0, z + 0.7, 1.8, 0.3, 1.2, '#d8d0c4', { mat: 'concrete' }); }
-function mailbox(F, x, z) { PB(F, x, 0, z, 0.12, 1.1, 0.12, '#666', { mat: 'metal' }); PB(F, x, 1.1, z, 0.35, 0.3, 0.55, spick(['#2a5aa0', '#ffffff', '#c0392b', '#1a1a1a']), { mat: 'metal' }); }
+function mailbox(F, x, z) { { const q = LP(F, x, 0, z); if (!offRoad(q.x, q.z, 1.0)) return; } PB(F, x, 0, z, 0.12, 1.1, 0.12, '#666', { mat: 'metal' }); PB(F, x, 1.1, z, 0.35, 0.3, 0.55, spick(['#2a5aa0', '#ffffff', '#c0392b', '#1a1a1a']), { mat: 'metal' }); }
 function hRanch(F, w, d) { // Bungalow im Ranch-Stil: lang, flaches Walmdach, Carport
   const W = w + 2.5, wall = spick(['#efe6d6', '#d9cbb3', '#e8dccc', '#cfd8d8', '#f2efe6', '#d8c8b0']), roofC = spick(['#ffffff', '#d8d8d8', '#c8b8a8']);
   PB(F, 0, -1.5, 0, W + 0.5, 1.8, d + 0.5, '#bdb3a2', { mat: 'concrete' }); PB(F, 0, 0.3, 0, W, 2.9, d, wall, { mat: srand() < 0.4 ? 'brick' : 'plaster' });
   part(F, G.pyr(), 0, 3.2, 0, W + 1.6, 1.5, d + 1.6, roofC, { mat: srand() < 0.5 ? 'slate' : 'roof' }); WIN_STYLE = 3;
   facade(F, W, d, 0.3, 1, 2.9, { sp: 3.0, ww: 1.6, wh: 1.2, door: -W * 0.25 }); houseDoor(F, -W * 0.25, d / 2, null);
   const cx = W / 2 + 1.8; for (const z of [-d / 2 + 1, d / 2 - 0.5]) PB(F, cx + 1.4, 0, z, 0.2, 2.6, 0.2, '#e8e8e8', { mat: 'metal' }); PB(F, cx, 2.6, 0, 3.4, 0.2, d + 0.6, '#d8d8d8', { mat: 'metal' });
-  if (Q().detail > 0 && srand() < 0.4) propCar(F, cx, 0, 0, spick(PAL.car)); mailbox(F, -W / 2 + 0.6, d / 2 + 4.6);
+  if (Q().detail > 0 && srand() < 0.4 && offRoad(LP(F, cx, 0, 0).x, LP(F, cx, 0, 0).z, 2)) propCar(F, cx, 0, 0, spick(PAL.car)); mailbox(F, -W / 2 + 0.6, d / 2 + 4.6);
   return { top: 4.7, flat: false, obbW: W };
 }
 function hMission(F, w, d) { // spanischer Stil: heller Putz, Ziegel-Satteldach, Arkaden-Veranda

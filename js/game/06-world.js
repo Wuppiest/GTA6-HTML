@@ -408,12 +408,20 @@ function propCar(F, x, z, ry, c) {
 
 // ---------- GRUNDSTÜCKE ----------
 const _nn = [];
+// Punkt frei von Fahrbahnen (pad = Abstand zum Fahrbahnrand; except = eigene Straße wird ignoriert)
+const _nn2 = [];
+function offRoad(x, z, pad = 0.5, except = null) { const r = Roads.nearest(x, z, 18, except ? (e) => e !== except : null); if (r && r.d < r.e.hw + pad) return false;
+  for (const n of Roads.nodesNear(x, z, 30, _nn2)) if (n.junction && Math.hypot(n.x - x, n.z - z) < n.r + pad && !(except && (except.a === n.id || except.b === n.id) && Math.hypot(n.x - x, n.z - z) > n.r - 0.5)) return false; return true; }
+// gedrehtes Rechteck frei von Fahrbahnen (Raster alle ~5 m)
+function rectFree(cx, cz, yaw, hx, hz, pad = 1) { const c = Math.cos(yaw), s = Math.sin(yaw), nx = Math.max(1, Math.ceil(hx / 2.5)), nz = Math.max(1, Math.ceil(hz / 2.5));
+  for (let i = -nx; i <= nx; i++) for (let j = -nz; j <= nz; j++) { const lx = i / nx * hx, lz = j / nz * hz; if (!offRoad(cx + lx * c + lz * s, cz - lx * s + lz * c, pad)) return false; } return true; }
 function lotFree(x, z, w, d, yaw, margin = 3) {
   const c = Math.cos(yaw), s = Math.sin(yaw), corners = [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2], [0, 0], [0, d / 2], [0, -d / 2], [w / 2, 0], [-w / 2, 0]]; let mn = 1e9, mx = -1e9;
   for (const [lx, lz] of corners) { const X = x + lx * c + lz * s, Z = z - lx * s + lz * c; const r = Roads.nearest(X, Z, 30); if (r && r.d < r.e.hw + margin) return null;
-    for (const n of Roads.nodesNear(X, Z, 24, _nn)) if (Math.hypot(n.x - X, n.z - Z) < n.r + margin + 2) return null;
+    for (const n of Roads.nodesNear(X, Z, 32, _nn)) if (Math.hypot(n.x - X, n.z - Z) < n.r + margin + 2) return null;
     const h = terrainHeight(X, Z); mn = Math.min(mn, h); mx = Math.max(mx, h); }
   if (mn < 1.4 || mx - mn > 7) return null;
+  if ((w > 12 || d > 12) && !rectFree(x, z, yaw, w / 2, d / 2, margin - 0.5)) return null;
   const R = Math.hypot(w, d) / 2 + 3; const near = World.query(x - R, z - R, x + R, z + R, _qb);
   for (const b of near) { if (b.tag === 'prop') continue; if (obbHit(x, z, w / 2, d / 2, yaw, b, LOT_GAP)) return null; }
   return { x, z, w, d, yaw, y: (mn + mx) / 2 - 0.1 };
@@ -546,6 +554,12 @@ function buildPier() { // Vergnügungs-Pier mit Riesenrad am Ocean Drive
 }
 
 // ---------- MILITÄRBASIS ----------
+// Zaun mit Pfosten und Drähten/Latten: Lücken an Straßen, Kollision je Abschnitt
+function fenceLine(x0, z0, x1, z1, sp, h, cPost, cRail, rails) { const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(L / sp)), F0 = FR(0, 0, 0, 0); let prev = null;
+  for (let i = 0; i <= n; i++) { const x = lerp(x0, x1, i / n), z = lerp(z0, z1, i / n), ok = offRoad(x, z, 1.6), y = terrainHeight(x, z);
+    if (!ok) { prev = null; continue; } PB(F0, x, y - 0.2, z, 0.12, h + 0.2, 0.12, cPost);
+    if (prev) { for (const yy of rails) seg(prev.x, prev.y + yy, prev.z, x, y + yy, z, 0.05, 0.05, cRail); World.addOBB((prev.x + x) / 2, (prev.z + z) / 2, 0.12, Math.hypot(x - prev.x, z - prev.z) / 2, Math.atan2(x - prev.x, z - prev.z), Math.max(prev.y, y) + h, Math.min(prev.y, y) - 1, 'prop'); }
+    prev = { x, y, z }; } }
 function buildBase() {
   const y = BASE.h, bx = BASE.x, bz = BASE.z, rx = bx - 70, F0 = FR(0, 0, 0, 0);
   PB(F0, rx, y - 1, bz, 46, 1.08, 840, '#55575c'); for (let z = -400; z <= 400; z += 30) PB(F0, rx, y + 0.09, bz + z, 1, 0.02, 14, '#f0f0f0');
@@ -572,8 +586,7 @@ function buildBase() {
   for (let i = 0; i < 3; i++) { PC(F0, bx + 100, y, bz - 280 + i * 16, 6, 7, '#d8d8d0', { seg: 14 }); World.addOBB(bx + 100, bz - 280 + i * 16, 5, 5, 0, y + 7); }
   const gx = bx + BASE.hx; PB(F0, gx - 2, y, bz + 40, 3, 3, 3, '#a8a890'); PB(F0, gx - 2, y + 3, bz + 40, 3.6, 0.3, 3.6, '#5a6a4a'); PB(F0, gx + 1, y + 1, bz + 60, 0.3, 0.3, 36, '#e8e8e8', { rx: 0 }); for (let z = 44; z < 80; z += 4) PB(F0, gx + 1, y + 1.05, bz + z, 0.32, 0.32, 1.8, '#c0392b');
   const fx0 = bx - BASE.hx, fx1 = bx + BASE.hx, fz0 = bz - BASE.hz, fz1 = bz + BASE.hz;
-  const fence = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n = Math.floor(L / 4); for (let i = 0; i <= n; i++) { const x = lerp(x0, x1, i / n), z = lerp(z0, z1, i / n), h = terrainHeight(x, z); PB(F0, x, h, z, 0.12, 3, 0.12, '#8a8f94'); }
-    for (const yy of [1, 2, 2.9]) seg(x0, terrainHeight(x0, z0) + yy, z0, x1, terrainHeight(x1, z1) + yy, z1, 0.04, 0.04, '#a0a4a8'); World.addOBB((x0 + x1) / 2, (z0 + z1) / 2, 0.2, L / 2, Math.atan2(x1 - x0, z1 - z0), Math.max(terrainHeight(x0, z0), terrainHeight(x1, z1)) + 3); };
+  const fence = (x0, z0, x1, z1) => fenceLine(x0, z0, x1, z1, 4, 3, '#8a8f94', '#a0a4a8', [1, 2, 2.9]);
   fence(fx0, fz0, fx1, fz0); fence(fx0, fz1, fx1, fz1); fence(fx0, fz0, fx0, fz1); fence(fx1, fz0, fx1, bz + 40); fence(fx1, bz + 80, fx1, fz1);
   addSign('SOLARA AIR BASE', '#ffb03a', fx1 + 1, y + 7, bz + 60, Math.PI / 2, 16, 3);
   PARKED.push(['jet', bx + 25, bz - 60, -Math.PI / 2], ['jet', bx + 25, bz - 20, -Math.PI / 2], ['plane', bx + 25, bz + 40, -Math.PI / 2], ['heli', LOC.helipads[0].x, LOC.helipads[0].z, -Math.PI / 2], ['heli', LOC.helipads[1].x, LOC.helipads[1].z, -Math.PI / 2, '#1d2b4a']);
@@ -657,16 +670,42 @@ function wall(mat, e, o, y0, y1, color, k0, k1, flip = false) { // senkrechte Ka
   for (let k = k0; k < k1; k++) { const p = P[k], q = P[k + 1]; const A = [p.x - p.tz * o, p.y + y0, p.z + p.tx * o, p.s * inv, y0 * inv], B = [q.x - q.tz * o, q.y + y0, q.z + q.tx * o, q.s * inv, y0 * inv], Cc = [q.x - q.tz * o, q.y + y1, q.z + q.tx * o, q.s * inv, y1 * inv], D = [p.x - p.tz * o, p.y + y1, p.z + p.tx * o, p.s * inv, y1 * inv];
     const sg = Math.sign(o) * (flip ? -1 : 1); a.quad(sg > 0 ? [A, B, Cc, D] : [A, D, Cc, B], -p.tz * sg, 0, p.tx * sg, color); }
 }
+// abgerundete Gehweg-Ecken zwischen benachbarten Straßen einer Kreuzung
+function hasWalk(e) { if (e.type !== 'street' || e.bridge || e.dirt) return false; const P = e.pts, zone = zoneAt(P[P.length >> 1].x, P[P.length >> 1].z); return !['rural', 'mountain', 'swamp'].includes(zone); }
+function junctionCorners(nd) {
+  const D = nd.dirs; if (!D || D.length < 2) return; const W = 3.2, y = nd.y + 0.21;
+  const endPts = (e, side) => { const n = e.pts.length, A = e.a === nd.id, k = A ? Math.min(n - 1, Math.ceil((nd.r + 1) / 4)) : Math.max(0, n - 1 - Math.ceil((nd.r + 1) / 4)), p = e.pts[k], tx = A ? p.tx : -p.tx, tz = A ? p.tz : -p.tz;
+    const px = -tz * side, pz = tx * side; return { i: [p.x + px * e.hw, p.z + pz * e.hw], o: [p.x + px * (e.hw + W), p.z + pz * (e.hw + W)], d: [tx, tz] }; };
+  const inter = (p, d, q, f) => { const den = d[0] * f[1] - d[1] * f[0]; if (Math.abs(den) < 1e-4) return null; const t = ((q[0] - p[0]) * f[1] - (q[1] - p[1]) * f[0]) / den; return [p[0] + d[0] * t, p[1] + d[1] * t]; };
+  for (let i = 0; i < D.length; i++) { const d1 = D[i], d2 = D[(i + 1) % D.length]; if (D.length === 2 && i === 1 && !nd.junction) break; if (!hasWalk(d1.e) || !hasWalk(d2.e)) continue;
+    let g = d2.a - d1.a; if (g <= 0) g += Math.PI * 2; if (g < 0.25) continue;
+    // Seite der Straße, die zur Ecke zeigt (Winkel aufsteigend = gegen den Uhrzeigersinn in x/z)
+    const E1 = endPts(d1.e, d1.e.a === nd.id ? 1 : -1), E2 = endPts(d2.e, d2.e.a === nd.id ? -1 : 1);
+    const curve = (a, b, da, db) => { const pts = [], N = 10; let c = null;
+      if (g < Math.PI - 0.08) c = inter(a, [-da[0], -da[1]], b, [-db[0], -db[1]]);
+      for (let k = 0; k <= N; k++) { const t = k / N; if (c) { const u = 1 - t; pts.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]]); }
+        else if (g <= Math.PI + 0.08) pts.push([lerp(a[0], b[0], t), lerp(a[1], b[1], t)]);
+        else { const a0 = Math.atan2(a[1] - nd.z, a[0] - nd.x), r0 = Math.hypot(a[0] - nd.x, a[1] - nd.z), r1 = Math.hypot(b[0] - nd.x, b[1] - nd.z); let a1 = Math.atan2(b[1] - nd.z, b[0] - nd.x); while (a1 < a0) a1 += Math.PI * 2; const aa = lerp(a0, a1, t), rr = lerp(r0, r1, t); pts.push([nd.x + Math.cos(aa) * rr, nd.z + Math.sin(aa) * rr]); } }
+      return pts; };
+    const I = curve(E1.i, E2.i, E1.d, E2.d), O = curve(E1.o, E2.o, E1.d, E2.d), aw = accFor('walk', nd.x, nd.z), ac = accFor('concrete', nd.x, nd.z);
+    for (let k = 0; k < I.length - 1; k++) { const a = I[k], b = I[k + 1], c2 = O[k + 1], d = O[k];
+      aw.quad([[a[0], y, a[1], a[0] / 3, a[1] / 3], [d[0], y, d[1], d[0] / 3, d[1] / 3], [c2[0], y, c2[1], c2[0] / 3, c2[1] / 3], [b[0], y, b[1], b[0] / 3, b[1] / 3]], 0, 1, 0, ROADC.walk);
+      const nx = -(b[1] - a[1]), nz = b[0] - a[0], l = Math.hypot(nx, nz) || 1, sgn = ((nd.x - a[0]) * nx + (nd.z - a[1]) * nz) > 0 ? 1 : -1;
+      ac.quad(sgn > 0 ? [[a[0], y - 0.22, a[1], 0, 0], [b[0], y - 0.22, b[1], 0.3, 0], [b[0], y, b[1], 0.3, 0.06], [a[0], y, a[1], 0, 0.06]] : [[a[0], y - 0.22, a[1], 0, 0], [a[0], y, a[1], 0, 0.06], [b[0], y, b[1], 0.3, 0.06], [b[0], y - 0.22, b[1], 0.3, 0]], nx / l * sgn, 0, nz / l * sgn, ROADC.curb); } }
+}
 function buildRoadMeshes() {
   for (const e of Roads.edges) {
     const A = Roads.nodes[e.a], B = Roads.nodes[e.b], P = e.pts, n = P.length, hw = e.hw;
     const kA = Math.min(n - 1, Math.ceil((A.r + 1) / 4)), kB = Math.max(0, n - 1 - Math.ceil((B.r + 1) / 4));
-    ribbon('road', e, -hw, hw, 0.06, new THREE.Color(ROADC.asph.r, hw / 16, e.type === 'highway' ? 0.5 : e.type === 'service' ? 0.75 : e.dirt ? 0.9 : 0.25));
+    const kr0 = A.junction ? clamp(Math.floor((A.r - 0.6) / e.len * (n - 1)), 0, n - 2) : 0, kr1 = B.junction ? clamp(Math.ceil((e.len - B.r + 0.6) / e.len * (n - 1)), kr0 + 1, n - 1) : n - 1;
+    ribbon('road', e, -hw, hw, 0.06, new THREE.Color(ROADC.asph.r, hw / 16, e.type === 'highway' ? 0.5 : e.type === 'service' ? 0.75 : e.dirt ? 0.9 : 0.25), kr0, kr1);
     const zone = zoneAt(P[n >> 1].x, P[n >> 1].z), urban = !['rural', 'mountain', 'swamp'].includes(zone) && !e.bridge && !e.dirt;
     if (e.bridge) for (const sd of [1, -1]) { const o = (hw + 0.35) * sd; wall('concrete', e, o, -0.2, 1.0, ROADC.curb, 0, n - 1); wall('concrete', e, o + 0.4 * sd, -0.2, 1.0, ROADC.curb, 0, n - 1, true); ribbon('concrete', e, Math.min(o, o + 0.4 * sd), Math.max(o, o + 0.4 * sd), 1.0, ROADC.curb); wall('concrete', e, (hw + 0.75) * sd, -3.5, -0.2, ROADC.walk2, 0, n - 1); }
     else if (e.type === 'street' && urban && kB > kA) { // Gehwege mit Bordstein
       for (const sd of [1, -1]) { const o0 = (hw) * sd, o1 = (hw + 3.2) * sd; ribbon('walk', e, Math.min(o0, o1), Math.max(o0, o1), 0.2, ROADC.walk, kA, kB); ribbon('concrete', e, Math.min(o0, o0 + 0.3 * sd), Math.max(o0, o0 + 0.3 * sd), 0.205, ROADC.curb, kA, kB); wall('concrete', e, o0, 0.0, 0.2, ROADC.curb, kA, kB); wall('concrete', e, o1, -0.8, 0.2, ROADC.walk2, kA, kB); } }
-    else if (e.type === 'highway' && zone !== 'strip' && kB > kA) for (const sd of [1, -1]) { wall('metal', e, (hw + 1.22) * sd, 0.45, 0.75, C3('#c4c8cc'), kA, kB); wall('metal', e, (hw + 1.18) * sd, 0.45, 0.75, C3('#c4c8cc'), kA, kB, true); for (let k = kA; k < kB; k += 1) { const p = P[k]; PB(null, p.x - p.tz * (hw + 1.25) * sd, p.y, p.z + p.tx * (hw + 1.25) * sd, 0.12, 0.7, 0.12, '#8a8e92', { mat: 'metal' }); } }
+    else if (e.type === 'highway' && zone !== 'strip' && kB > kA) for (const sd of [1, -1]) { const ok = []; for (let k = kA; k <= kB; k++) { const p = P[k]; ok[k] = offRoad(p.x - p.tz * (hw + 1.25) * sd, p.z + p.tx * (hw + 1.25) * sd, 0.6, e); }
+      let r0 = -1; for (let k = kA; k <= kB; k++) { const good = k < kB && ok[k] && ok[k + 1]; if (good && r0 < 0) r0 = k; if (!good && r0 >= 0) { wall('metal', e, (hw + 1.22) * sd, 0.45, 0.75, C3('#c4c8cc'), r0, k); wall('metal', e, (hw + 1.18) * sd, 0.45, 0.75, C3('#c4c8cc'), r0, k, true); r0 = -1; } }
+      for (let k = kA; k < kB; k += 1) { if (!ok[k]) continue; const p = P[k]; PB(null, p.x - p.tz * (hw + 1.25) * sd, p.y, p.z + p.tx * (hw + 1.25) * sd, 0.12, 0.7, 0.12, '#8a8e92', { mat: 'metal' }); } }
     // Zebrastreifen & Haltelinien an großen Kreuzungen
     const dirAt = (ed, nd) => { const P2 = ed.pts, q = ed.a === nd.id ? P2[Math.min(3, P2.length - 1)] : P2[Math.max(0, P2.length - 4)]; return Math.atan2(q.x - nd.x, q.z - nd.z); };
     if (e.type === 'street' && e.hw >= 4.5) for (const [node, end] of [[A, 0], [B, 1]]) { if (node.edges.length < 3) continue;
@@ -674,11 +713,11 @@ function buildRoadMeshes() {
       const k = end === 0 ? Math.min(n - 1, Math.ceil((node.r + 2) / 4)) : Math.max(0, n - 1 - Math.ceil((node.r + 2) / 4)), p = P[k], F = FR(p.x, p.y + 0.08, p.z, Math.atan2(p.tx, p.tz));
       for (let s = -hw + 0.9; s <= hw - 0.9; s += 1.2) PB(F, s, 0, 0, 0.6, 0.02, 2.8, '#ececec', { mat: 'mark', keep: true }); PB(F, (end === 0 ? -1 : 1) * hw / 2, 0, (end === 0 ? 2.2 : -2.2), hw - 0.6, 0.02, 0.4, '#ececec', { mat: 'mark' }); }
   }
-  for (const nd of Roads.nodes) { const two = nd.edges.length <= 2, R = two ? Math.max(...nd.edges.map(i => Roads.edges[i].hw)) + 0.2 : nd.r - 0.6; part(null, G.cyl(24), nd.x, nd.y - 0.5, nd.z, R * 2, two ? 0.535 : 0.565, R * 2, ROADC.asph2, { mat: 'road', keep: true }); }
+  for (const nd of Roads.nodes) { const jn = nd.junction, R = jn ? nd.r : Math.max(...nd.edges.map(i => Roads.edges[i].hw)) + 0.2; part(null, G.cyl(32), nd.x, nd.y - 0.5, nd.z, R * 2, jn ? 0.59 : 0.535, R * 2, jn ? new THREE.Color(ROADC.asph.r, ROADC.asph.g, ROADC.asph.b * 1.0001) : ROADC.asph2, { mat: 'road', keep: true }); if (jn) junctionCorners(nd); }
 }
 
 // ---------- STRASSENMÖBEL ----------
-function lampPost(x, y, z, yaw, c = '#2a2c30') { const F = FR(x, y, z, yaw); PC(F, 0, 0, 0, 0.13, 7.4, c, { seg: 6 }); PB(F, 0, 7.2, 0.9, 0.12, 0.12, 2, c); PB(F, 0, 7.05, 1.9, 0.5, 0.2, 0.9, c); PG(F, 0, 6.98, 1.9, 0.4, 0.06, 0.75, '#fff0c8'); PC(F, 0, 0, 0, 0.22, 0.5, c, { seg: 6 });
+function lampPost(x, y, z, yaw, c = '#2a2c30') { if (!offRoad(x, z, 0.3)) return; const F = FR(x, y, z, yaw); PC(F, 0, 0, 0, 0.13, 7.4, c, { seg: 6 }); PB(F, 0, 7.2, 0.9, 0.12, 0.12, 2, c); PB(F, 0, 7.05, 1.9, 0.5, 0.2, 0.9, c); PG(F, 0, 6.98, 1.9, 0.4, 0.06, 0.75, '#fff0c8'); PC(F, 0, 0, 0, 0.22, 0.5, c, { seg: 6 });
   World.lampAnchors.push(LP(F, 0, 6.6, 1.9)); World.addOBB(x, z, 0.2, 0.2, 0, y + 7.4, y - 1, 'prop'); }
 // ---------- AMPELN (echte Schaltung: Grün → Gelb → Rot, gegenüberliegende Zufahrten gemeinsam) ----------
 const Signals = {
@@ -698,7 +737,7 @@ const Signals = {
       this.mesh.setColorAt(i, L.kind === 3 ? (st === 'r' ? on[3] : off[3]) : lit ? on[L.kind] : off[L.kind]); }); this.mesh.instanceColor.needsUpdate = true; },
   update(dt) { this.t += dt; this.upT -= dt; if (this.upT <= 0 && this.mesh) { this.upT = 0.25; this.paint(); } },
 };
-function trafficLight(x, y, z, yaw, arm, nodeId, edgeId) { const F = FR(x, y, z, yaw); PC(F, 0, 0, 0, 0.15, 6.2, '#3a3c40', { seg: 6, mat: 'metal', keep: true }); PB(F, -arm / 2, 6, 0, arm, 0.18, 0.18, '#3a3c40', { mat: 'metal', keep: true });
+function trafficLight(x, y, z, yaw, arm, nodeId, edgeId) { if (!offRoad(x, z, 0.25)) return; const F = FR(x, y, z, yaw); PC(F, 0, 0, 0, 0.15, 6.2, '#3a3c40', { seg: 6, mat: 'metal', keep: true }); PB(F, -arm / 2, 6, 0, arm, 0.18, 0.18, '#3a3c40', { mat: 'metal', keep: true });
   for (const ax of [-arm + 1.2, -arm * 0.5]) { PB(F, ax, 4.9, 0, 0.45, 1.3, 0.35, '#1e2024', { keep: true }); for (let i = 0; i < 3; i++) Signals.addLamp(LP(F, ax, 5.15 + i * 0.4, 0.2), nodeId, edgeId, 2 - i); }
   PB(F, 0.1, 2.5, 0.12, 0.3, 0.5, 0.2, '#1e2024'); Signals.addLamp(LP(F, 0.1, 2.75, 0.24), nodeId, edgeId, 3); World.addOBB(x, z, 0.2, 0.2, 0, y + 6, y - 1, 'prop'); }
 function bench(F, x, z, ry) { const M = FRL(F, x, 0.2, z, ry); PB(M, 0, 0.42, 0, 1.8, 0.08, 0.5, '#8a5a3a'); PB(M, 0, 0.62, -0.22, 1.8, 0.4, 0.06, '#8a5a3a'); for (const sx of [-0.75, 0.75]) PB(M, sx, 0, 0, 0.08, 0.45, 0.45, '#2a2a2e'); }
@@ -707,7 +746,7 @@ function busStop(F, x, z, ry) { const M = FRL(F, x, 0.2, z, ry); PB(M, 0, 2.5, 0
 function hydrant(F, x, z) { const M = FRL(F, x, 0.2, z, 0); PC(M, 0, 0, 0, 0.16, 0.6, '#d82020'); PS(M, 0, 0.62, 0, 0.17, '#d82020'); PC(M, 0, 0.35, 0, 0.07, 0.1, '#d82020', { rx: Math.PI / 2 }); }
 function bin(F, x, z) { const M = FRL(F, x, 0.2, z, 0); PC(M, 0, 0, 0, 0.3, 0.9, '#2a5a3a', { seg: 8 }); PC(M, 0, 0.9, 0, 0.33, 0.08, '#1a3a2a', { seg: 8 }); }
 function newsBox(F, x, z, ry) { const M = FRL(F, x, 0.2, z, ry); PB(M, 0, 0, 0, 0.5, 1.0, 0.45, spick(['#1f4fa0', '#c0392b', '#ffd23a'])); }
-function streetSign(x, y, z, yaw, name) { const F = FR(x, y, z, yaw); PB(F, 0, 0, 0, 0.08, 3.2, 0.08, '#6a6e74'); Signs.quad(F, 0, 2.9, 0, 1.8, 0.35, Math.PI / 2, Signs.cell(name, '#1a6a3a', '#fff')); Signs.quad(F, 0, 2.9, 0, 1.8, 0.35, -Math.PI / 2, Signs.cell(name, '#1a6a3a', '#fff')); }
+function streetSign(x, y, z, yaw, name) { if (!offRoad(x, z, 0.3)) return; const F = FR(x, y, z, yaw); PB(F, 0, 0, 0, 0.08, 3.2, 0.08, '#6a6e74'); Signs.quad(F, 0, 2.9, 0, 1.8, 0.35, Math.PI / 2, Signs.cell(name, '#1a6a3a', '#fff')); Signs.quad(F, 0, 2.9, 0, 1.8, 0.35, -Math.PI / 2, Signs.cell(name, '#1a6a3a', '#fff')); }
 function buildStreetFurniture() {
   let ni = 0;
   for (const e of Roads.edges) {
@@ -717,19 +756,19 @@ function buildStreetFurniture() {
     const lampSp = urban ? 30 : 45; for (let s = A.r + 6, k = 0; s < e.len - B.r - 6; s += lampSp, k++) { const i = Math.round(s / e.len * (n - 1)), p = P[i], sd = k % 2 ? 1 : -1, off = e.hw + (e.type === 'highway' ? 2.1 : 0.9);
       if (zone === 'mountain' && k % 2) continue; if (e.type === 'service') continue; lampPost(p.x - p.tz * off * sd, p.y + (e.type === 'street' && urban ? 0.2 : 0), p.z + p.tx * off * sd, Math.atan2(p.tz * sd, -p.tx * sd)); }
     if (e.type !== 'street') { // Werbetafeln am Highway
-      if (e.type === 'highway' && zone !== 'strip' && srand() < 0.35) { const i = n >> 1, p = P[i], sd = srand() < 0.5 ? 1 : -1, off = e.hw + 9, x = p.x - p.tz * off * sd, z = p.z + p.tx * off * sd, h = terrainHeight(x, z), F = FR(x, h, z, Math.atan2(p.tz * sd, -p.tx * sd));
+      if (e.type === 'highway' && zone !== 'strip' && srand() < 0.35) { const i = n >> 1, p = P[i], sd = srand() < 0.5 ? 1 : -1, off = e.hw + 9, x = p.x - p.tz * off * sd, z = p.z + p.tx * off * sd, h = terrainHeight(x, z), F = FR(x, h, z, Math.atan2(p.tz * sd, -p.tx * sd)); if (!rectFree(x, z, Math.atan2(p.tz * sd, -p.tx * sd), 7, 1, 1)) continue;
         for (const sx of [-3, 3]) PB(F, sx, -1, 0, 0.35, 8, 0.35, '#5a5e64'); PB(F, 0, 6.5, -0.15, 13, 4.4, 0.3, '#2a2c30'); const ad = spick(ADS); Signs.quad(F, 0, 6.7, 0.05, 12.4, 4, 0, Signs.cell(ad[0], ad[1], ad[2], 2, 1)); PG(F, 0, 11, 0.6, 12, 0.12, 0.12, '#fff0c8'); World.addOBB(x, z, 6.5, 0.4, Math.atan2(p.tz * sd, -p.tx * sd), h + 11); }
       continue; }
     if (!urban) { // Strommasten auf dem Land
-      let prev = null; for (let s = A.r + 8; s < e.len - B.r - 8; s += 38) { const i = Math.round(s / e.len * (n - 1)), p = P[i], off = e.hw + 3.5, x = p.x - p.tz * off, z = p.z + p.tx * off, h = terrainHeight(x, z), F = FR(x, h, z, Math.atan2(p.tx, p.tz));
+      let prev = null; for (let s = A.r + 8; s < e.len - B.r - 8; s += 38) { const i = Math.round(s / e.len * (n - 1)), p = P[i], off = e.hw + 3.5, x = p.x - p.tz * off, z = p.z + p.tx * off, h = terrainHeight(x, z), F = FR(x, h, z, Math.atan2(p.tx, p.tz)); if (!offRoad(x, z, 1.2) || !offRoad(LP(F, 1.3, 0, 0).x, LP(F, 1.3, 0, 0).z, 0.2) || !offRoad(LP(F, -1.3, 0, 0).x, LP(F, -1.3, 0, 0).z, 0.2)) { prev = null; continue; }
         PC(F, 0, -0.5, 0, 0.16, 9.2, '#6a4a2a', { seg: 6 }); PB(F, 0, 8.2, 0, 2.6, 0.15, 0.15, '#6a4a2a'); for (const sx of [-1.1, 0, 1.1]) PC(F, sx, 8.35, 0, 0.06, 0.25, '#c8d0d8', { seg: 5 });
         if (prev) for (const sx of [-1.1, 0, 1.1]) { const a = LP(prev, sx, 8.5, 0), b = LP(F, sx, 8.5, 0); seg(a.x, a.y, a.z, b.x, b.y, b.z, 0.035, 0.035, '#1a1a1a'); } prev = F; World.addOBB(x, z, 0.2, 0.2, 0, h + 9, h - 1, 'prop'); }
       continue; }
     // Bänke, Mülleimer, Hydranten, Bushaltestellen, Zeitungsboxen
-    for (let s = A.r + 12; s < e.len - B.r - 12; s += sr(14, 26)) { const i = Math.round(s / e.len * (n - 1)), p = P[i], sd = srand() < 0.5 ? 1 : -1, off = e.hw + 2.2, F = FR(p.x - p.tz * off * sd, p.y, p.z + p.tx * off * sd, Math.atan2(-p.tz * sd, p.tx * sd)); const r = srand();
+    for (let s = A.r + 12; s < e.len - B.r - 12; s += sr(14, 26)) { const i = Math.round(s / e.len * (n - 1)), p = P[i], sd = srand() < 0.5 ? 1 : -1, off = e.hw + 2.2, F = FR(p.x - p.tz * off * sd, p.y, p.z + p.tx * off * sd, Math.atan2(-p.tz * sd, p.tx * sd)); const r = srand(); { const q = LP(F, 0, 0, 0); if (!offRoad(q.x, q.z, 1.0)) continue; World.addOBB(q.x, q.z, r < 0.2 ? 0.9 : 0.35, r < 0.2 ? 0.3 : 0.35, Math.atan2(-p.tz * sd, p.tx * sd), p.y + 1.0, p.y - 1, 'prop'); }
       if (r < 0.2) bench(F, 0, 0.4, 0); else if (r < 0.45) bin(F, 0, 0); else if (r < 0.6) hydrant(F, 0, 0); else if (r < 0.68 && zone !== 'suburb') newsBox(F, 0, 0, 0);
       else if (r < 0.78 && ['downtown', 'strip', 'uptown', 'urban', 'midtown'].includes(zone)) { const q = LP(F, 0, 0, 0); TREES.push({ t: 'palm', x: q.x, z: q.z, s: 0.9 }); PB(F, 0, 0.2, 0, 1.6, 0.4, 1.6, '#b8b4aa'); } }
-    if ((zone === 'downtown' || zone === 'strip' || zone === 'village') && e.len > 70) { const i = n >> 1, p = P[i], sd = e.id % 2 ? 1 : -1, off = e.hw + 2.4; busStop(FR(p.x - p.tz * off * sd, p.y, p.z + p.tx * off * sd, Math.atan2(-p.tz * sd, p.tx * sd)), 0, 0, 0); }
+    if ((zone === 'downtown' || zone === 'strip' || zone === 'village') && e.len > 70 && offRoad(P[n >> 1].x - P[n >> 1].tz * (e.hw + 2.4) * (e.id % 2 ? 1 : -1), P[n >> 1].z + P[n >> 1].tx * (e.hw + 2.4) * (e.id % 2 ? 1 : -1), 2.2)) { const i = n >> 1, p = P[i], sd = e.id % 2 ? 1 : -1, off = e.hw + 2.4; { const bx = p.x - p.tz * off * sd, bz = p.z + p.tx * off * sd; World.addOBB(bx - p.tz * sd * 0.6, bz + p.tx * sd * 0.6, 2.1, 0.5, Math.atan2(-p.tz * sd, p.tx * sd), p.y + 2.7, p.y - 1, 'prop'); } busStop(FR(p.x - p.tz * off * sd, p.y, p.z + p.tx * off * sd, Math.atan2(-p.tz * sd, p.tx * sd)), 0, 0, 0); }
     // Ampeln & Straßenschilder an Kreuzungen
     for (const [node, end] of [[A, 0], [B, 1]]) { if (node.edges.length < 3) continue; const k = end === 0 ? Math.min(n - 1, Math.ceil((node.r + 3.5) / 4)) : Math.max(0, n - 1 - Math.ceil((node.r + 3.5) / 4)), p = P[k], dir = end === 0 ? -1 : 1;
       const tx = p.tx * -dir, tz = p.tz * -dir, sx = p.x - tz * (e.hw + 1.2), sz = p.z + tx * (e.hw + 1.2);
@@ -786,6 +825,7 @@ function buildVegetation() {
   // Weiden an Seeufern, Seerosen in Sumpf und Seen
   for (const L of LAKES) for (let k = 0; k < 26; k++) { const a = sr(0, TAU), d = L.r * sr(1.12, 1.45), x = L.x + Math.cos(a) * d, z = L.z + Math.sin(a) * d, h = terrainHeight(x, z); if (h < 0.8 || Roads.nearest(x, z, 10)) continue; TREES.push({ t: srand() < 0.6 ? 'willow' : 'tree', x, z, s: sr(0.9, 1.25) }); }
   for (let k = 0; k < 2600; k++) { const x = sr(-1950, 1950), z = sr(-1950, 1950); if (!(Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r || inLake(x, z))) continue; const h = terrainHeight(x, z); if (h > -0.06 || h < -2.6) continue; TREES.push({ t: 'lily', x, z, y: CFG.WATER_Y + 0.03, s: sr(0.7, 1.3), sy: 1 }); }
+  { const keep = TREES.filter(t => t.t === 'lily' || offRoad(t.x, t.z, t.t === 'flower' || t.t === 'bush' ? 0.6 : 1.2)); TREES.length = 0; TREES.push(...keep); }
   World.palmU = { uTime: { value: 0 }, uWind: { value: 0.6 } };
   const pbr = Q().detail > 0, mats = {};
   const matFor = (sway) => { const k = sway ? 'sway' + sway : 'still'; if (mats[k]) return mats[k];
@@ -814,7 +854,7 @@ function buildVegetation() {
   for (const p of TREES) { if (p.sy === undefined) p.sy = p.t === 'rock' ? sr(0.6, 1.1) : sr(0.82, 1.22); if (p.t === 'rock' || p.t === 'bush' || p.t === 'flower' || p.t === 'lily') continue; World.addOBB(p.x, p.z, 0.32, 0.32, 0, terrainHeight(p.x, p.z) + 6, -50, 'prop'); }
   const by = (t) => TREES.filter(p => p.t === t);
   place('palm', by('palm'), true, 2.0); place('tree', by('tree'), true, 1.2); place('birch', by('birch'), true, 1.4); place('willow', by('willow'), true, 1.0); place('lily', by('lily'), false, 0); place('pine', by('pine'), true, 1.0); place('bush', by('bush'), false, 0); place('flower', by('flower'), false, 0);
-  const rocks = by('rock'); rocks.forEach(p => { p.s = sr(0.8, 2.2); }); place('rock', rocks, true, 0);
+  const rocks = by('rock'); rocks.forEach(p => { p.s = sr(0.8, 2.2); const r = 0.75 * p.s; World.addOBB(p.x, p.z, r, r, p.r || 0, terrainHeight(p.x, p.z) + 1.6 * p.s * (p.sy || 1), -50, 'prop'); }); place('rock', rocks, true, 0);
 }
 
 // ---------- GELÄNDE-MESH (Felder, Wald, Strand, Fels) ----------

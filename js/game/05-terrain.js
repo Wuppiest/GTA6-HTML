@@ -165,7 +165,7 @@ const Roads = {
   sampleAll() {
     for (const n of this.nodes) { let s = 0, c = 0; for (let k = 0; k < 6; k++) { s += terrainHeight(n.x + Math.cos(k) * 8, n.z + Math.sin(k) * 8); c++; } n.y = Math.max(n.edges.some(i => this.edges[i].bridge) ? 2.4 : 1.6, s / c); }
     this.nh = new Map(); for (const n of this.nodes) { const k = Math.floor(n.x / 64) * 4096 + Math.floor(n.z / 64); let a = this.nh.get(k); if (!a) this.nh.set(k, a = []); a.push(n); }
-    for (const n of this.nodes) n.r = Math.max(...n.edges.map(i => this.edges[i].hw)) + (n.edges.length >= 3 ? 2.0 : 1.0);
+    for (const n of this.nodes) n.r = Math.max(...n.edges.map(i => this.edges[i].hw)) + 1.0;
     for (const e of this.edges) {
       const A = this.nodes[e.a], B = this.nodes[e.b], dx = B.x - A.x, dz = B.z - A.z, L0 = Math.hypot(dx, dz);
       const mid = V3((A.x + B.x) / 2 - dz / L0 * e.bend, 0, (A.z + B.z) / 2 + dx / L0 * e.bend);
@@ -178,6 +178,12 @@ const Roads = {
       e.len = L;
       e.pts.forEach((p, k) => { const key = Math.floor(p.x / this.HC) * 4096 + Math.floor(p.z / this.HC); let a = this.hash.get(key); if (!a) { a = []; this.hash.set(key, a); } a.push(e.id, k); });
     }
+    // Knotengröße nach Kreuzungswinkel: spitze Winkel brauchen eine größere Kreuzungsfläche, damit sich Fahrbahnen nicht überlagern
+    for (const n of this.nodes) { const dirs = n.edges.map(i => { const e = this.edges[i], P = e.pts, q = e.a === n.id ? P[Math.min(2, P.length - 1)] : P[Math.max(0, P.length - 3)]; return { e, a: Math.atan2(q.z - n.z, q.x - n.x) }; }).sort((p, q) => p.a - q.a);
+      n.dirs = dirs; const mx = Math.max(...dirs.map(d => d.e.hw)); let need = 0, minGap = 7;
+      for (let i = 0; i < dirs.length && dirs.length > 1; i++) { const d1 = dirs[i], d2 = dirs[(i + 1) % dirs.length]; let g = d2.a - d1.a; if (g <= 0) g += Math.PI * 2; minGap = Math.min(minGap, g); if (g < Math.PI * 0.97) need = Math.max(need, ((d1.e.hw + d2.e.hw) / 2 + 1.2) / Math.tan(g / 2)); }
+      n.junction = dirs.length >= 3 || (dirs.length === 2 && minGap < 2.6) || dirs.length === 1;
+      n.r = n.junction ? clamp(Math.max(mx + 1.6, need), mx + 1.6, 26) : mx + 0.6; }
   },
   nearest(x, z, maxD = 60, filter = null) {
     let best = null, bd = maxD * maxD; const r = Math.ceil(maxD / this.HC);
@@ -240,9 +246,38 @@ const Net = {
     for (let k = 0; k <= n; k++) { const t = k / n, u = 1 - t; s.poly.push([u * u * A.x + 2 * u * t * mx + t * t * B.x, u * u * A.z + 2 * u * t * mz + t * t * B.z]); }
     s.x0 = Math.min(...s.poly.map(p => p[0])) - 1; s.x1 = Math.max(...s.poly.map(p => p[0])) + 1; s.z0 = Math.min(...s.poly.map(p => p[1])) - 1; s.z1 = Math.max(...s.poly.map(p => p[1])) + 1; },
   addSeg(a, b, type, bend, f) { if (a === b || a.segs.some(s => s.a === b || s.b === b)) return null;
-    const s = { a, b, type, bend, f: f || null, alive: true }; this.geom(s); this.segs.push(s); a.segs.push(s); b.segs.push(s); return s; },
+    const s = { a, b, type, bend, f: f || null, alive: true, rank: this.rank || 1 }; this.geom(s); this.segs.push(s); a.segs.push(s); b.segs.push(s); return s; },
   kill(s) { s.alive = false; s.a.segs = s.a.segs.filter(q => q !== s); s.b.segs = s.b.segs.filter(q => q !== s); },
-  split(s, N) { this.kill(s); this.addSeg(s.a, N, s.type, 0, s.f); this.addSeg(N, s.b, s.type, 0, s.f); },
+  split(s, N) { this.kill(s); const r0 = this.rank; this.rank = s.rank; this.addSeg(s.a, N, s.type, 0, s.f); this.addSeg(N, s.b, s.type, 0, s.f); this.rank = r0; },
+  // Aufräumen: Doppelknoten zusammenlegen, spitze Winkel und Überlagerungen auflösen (unwichtigere Straße entfällt, wenn das Netz verbunden bleibt)
+  cleanup() {
+    const rankOf = (s) => (s.f && s.f.bridge ? 9 : 0) + (s.type === 'highway' ? 4 : 0) + (s.rank || 1);
+    const other = (s, n) => (s.a === n ? s.b : s.a), slen = (s) => Math.hypot(s.a.x - s.b.x, s.a.z - s.b.z);
+    const dirFrom = (s, n) => { const P = s.poly, p0 = s.a === n ? P[0] : P[P.length - 1], p1 = s.a === n ? P[1] : P[P.length - 2]; return Math.atan2(p1[1] - p0[1], p1[0] - p0[0]); };
+    const connected = (a, b, without) => { const seen = new Set([a]), q = [a]; while (q.length) { const n = q.pop(); if (n === b) return true; for (const s of n.segs) { if (s === without || !s.alive) continue; const m = other(s, n); if (!seen.has(m)) { seen.add(m); q.push(m); } } if (seen.size > 6000) return true; } return false; };
+    const drop = (s) => { if (!s.alive || (s.f && s.f.bridge)) return false; const A = s.a, B = s.b; if (!connected(A, B, s)) return false; this.kill(s); return true; };
+    let merged = 0, acute = 0, over = 0;
+    // 1) sehr kurze Strecken: Endpunkte verschmelzen
+    for (const s of [...this.segs]) { if (!s.alive || slen(s) > 15 || (s.f && s.f.bridge)) continue; const A = s.a, B = s.b; if (B.gate || B.culdesac) continue;
+      this.kill(s); A.x = (A.x + B.x) / 2; A.z = (A.z + B.z) / 2; for (const q of [...B.segs]) { const o = other(q, B); this.kill(q); if (o !== A) { const r0 = this.rank; this.rank = q.rank; this.addSeg(A, o, q.type, 0, q.f); this.rank = r0; } }
+      for (const q of A.segs) this.geom(q); merged++; }
+    // 2) spitze Winkel an Knoten
+    for (let pass = 0; pass < 4; pass++) for (const n of this.nodes) { if (n.segs.length < 2) continue; let done = false;
+      for (let i = 0; i < n.segs.length && !done; i++) for (let j = i + 1; j < n.segs.length && !done; j++) { const s1 = n.segs[i], s2 = n.segs[j];
+        if (Math.abs(wrapAngle(dirFrom(s1, n) - dirFrom(s2, n))) > 0.62) continue;
+        const v = rankOf(s1) < rankOf(s2) || (rankOf(s1) === rankOf(s2) && slen(s1) > slen(s2)) ? [s1, s2] : [s2, s1];
+        if (drop(v[0]) || drop(v[1])) { acute++; done = true; } } }
+    // 3) Straßen, die sich ohne Kreuzung überlagern
+    const live = this.segs.filter(s => s.alive);
+    for (let i = 0; i < live.length; i++) { const s1 = live[i]; if (!s1.alive) continue;
+      for (let j = i + 1; j < live.length; j++) { const s2 = live[j]; if (!s2.alive || s1.x1 < s2.x0 - 20 || s1.x0 > s2.x1 + 20 || s1.z1 < s2.z0 - 20 || s1.z0 > s2.z1 + 20) continue;
+        if (s1.a === s2.a || s1.a === s2.b || s1.b === s2.a || s1.b === s2.b) continue;
+        const lim = ((s1.f && s1.f.hw) || (s1.type === 'highway' ? 8 : 6.5)) + ((s2.f && s2.f.hw) || (s2.type === 'highway' ? 8 : 6.5)) + 1.5; let hit = false;
+        for (let k = 0; k <= 8 && !hit; k++) { const t = k / 8, P = s1.poly, f = t * (P.length - 1), q = Math.min(P.length - 2, Math.floor(f)), u = f - q, x = lerp(P[q][0], P[q + 1][0], u), z = lerp(P[q][1], P[q + 1][1], u);
+          const Q = s2.poly; for (let m = 0; m < Q.length - 1 && !hit; m++) { const ax = Q[m][0], az = Q[m][1], vx = Q[m + 1][0] - ax, vz = Q[m + 1][1] - az, l2 = vx * vx + vz * vz || 1, tt = clamp(((x - ax) * vx + (z - az) * vz) / l2, 0, 1); if (Math.hypot(ax + vx * tt - x, az + vz * tt - z) < lim) hit = true; } }
+        if (!hit) continue; const v = rankOf(s1) < rankOf(s2) || (rankOf(s1) === rankOf(s2) && slen(s1) > slen(s2)) ? [s1, s2] : [s2, s1]; if (drop(v[0]) || drop(v[1])) over++; } }
+    this.stats = { merged, acute, over };
+  },
   // erster Schnittpunkt der Strecke P→B mit dem Bestand (Parameter t, Punkt, Strecke)
   firstHit(P, B, bend, skipD) {
     const dx = B.x - P.x, dz = B.z - P.z, L = Math.hypot(dx, dz) || 1, mx = (P.x + B.x) / 2 - dz / L * bend, mz = (P.z + B.z) / 2 + dx / L * bend, n = bend ? 6 : 1, poly = [];
@@ -348,6 +383,7 @@ function pathOK(a, b, allowDist = null) { const L = Math.hypot(b.x - a.x, b.z - 
   return (hmax - hmin) / Math.max(L, 1) < 0.22; }
 
 function buildRoadNetwork() {
+  Net.rank = 2;
   // 1) Downtown: unregelmäßiges Raster, Diagonal-Boulevard, Park-Superblock, Bayfront folgt der Küste
   const dtU = cum([84, 98, 74, 106, 88]), dtV = cum([92, 78, 108, 86, 100, 82]);
   const dt = gridNet(DOWNTOWN, 0.1, dtU, dtV, { warp: 6, seed: 3.3, fu: (i, j) => (j % 3 === 0 ? null : { hw: 5.4 }), fv: (i, j) => (i === 2 || i === 5 ? null : { hw: 5.8 }), skip: (i, j, d) => (d === 'u' && j === 2 && (i === 0 || i === 1)) || (d === 'v' && i === 1 && (j === 1 || j === 2)) || (d === 'v' && i === 4 && j === 4) });
@@ -438,6 +474,7 @@ function buildRoadNetwork() {
   for (let q = 0; q <= 10; q++) { const a = a0 + q * 0.85, r = lerp(330, 44, q / 10); spiral.push(Net.node(MOUNT.x + Math.cos(a) * r, MOUNT.z + Math.sin(a) * r, { mountain: true })); }
   for (let q = 0; q < spiral.length - 1; q++) Net.link(spiral[q], spiral[q + 1], 'street', 22);
   LOC.summit = V3(MOUNT.x, 0, MOUNT.z);
+  Net.rank = 1;
   // 15) Landstraßen: lockeres Netz aus Wegpunkten, verbunden mit Dörfern und Bezirken
   const rural = [];
   for (let gx = -1850; gx <= 950; gx += 300) for (let gz = -1700; gz <= 1700; gz += 300) { const x = gx + sr(-100, 100), z = gz + sr(-100, 100);
@@ -468,6 +505,7 @@ function buildRoadNetwork() {
     const cnt = {}; let n = 0; for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { const x = lerp(x0, x1, (i + 0.5) / 6), z = lerp(z0, z1, (j + 0.5) / 6); if (!pip(x, z, P)) continue; n++; const k = zoneNet(x, z); cnt[k] = (cnt[k] || 0) + 1; }
     if (!n) return null; if ((cnt.urban || 0) / n >= 0.3) return SUB.urban; let best = null, bc = 0; for (const k in cnt) if (cnt[k] > bc) { bc = cnt[k]; best = k; } return SUB[best] || null; },
     [LOC.cbdPark, { x: DOWNTOWN.x + 30, z: DOWNTOWN.z - 300 }]);
+  Net.cleanup();
   Net.finalize();
   const R = (n) => Net.map.get(n) || Roads.nearestNode(n.x, n.z), R2 = (g) => g.map(row => row.map(R));
   Roads.groups = { ring: ring.map(R), dt: R2(dt), sb: R2(sb), pt: R2(pt), spiral: spiral.map(R), collins: collins.map(R), ocean: ocean.map(R), alton: alton.map(R), up: R2(up), mid: R2(mid), ind: R2(ind), vg: R2(vg), vg2: R2(vg2), old: [...round, ...inner, ...ring2, ...exits].map(R), kendall: outer.map(R), heights: arcs.flat().map(R), hw1: hw1.map(R), hw2: hw2.map(R) };
