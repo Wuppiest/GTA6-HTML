@@ -127,6 +127,7 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-touch-callout:none;
 /* Touch-Steuerung */
 #touch{position:fixed;inset:0;z-index:6;pointer-events:none;display:none}
 #touch.on{display:block}
+body:has(#menu:not(.hidden)) #touch{display:none}
 #stickZone{position:absolute;left:0;bottom:0;width:42%;height:62%;pointer-events:auto}
 #stickBase{position:absolute;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.3);display:none;transform:translate(-50%,-50%)}
 #stickKnob{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(255,255,255,.35);border:2px solid rgba(255,255,255,.6)}
@@ -171,3 +172,68 @@ html,body{touch-action:none;overscroll-behavior:none;-webkit-touch-callout:none;
 #actMenu .am-close{margin:8px;padding:12px;border-radius:10px;border:0;background:#ff2d95;color:#fff;font-weight:700;font-size:15px}
 
 .credits{margin-top:14px;font-size:12px;color:#bdb4d6}.credits summary{cursor:pointer;color:#fff;font-weight:700;letter-spacing:.08em}.credits p{margin:6px 0}
+
+/* ===================== HAUPTMENÜ (Titelbildschirm) ===================== */
+#menu{display:block;background:none;padding:0;overflow:hidden}
+#menu.hidden{display:none}
+#menu .mm-shade{position:absolute;inset:0;pointer-events:none;background:
+  linear-gradient(90deg,rgba(8,3,20,.88) 0%,rgba(8,3,20,.62) 28%,rgba(8,3,20,.08) 58%,rgba(8,3,20,0) 70%),
+  linear-gradient(0deg,rgba(8,3,20,.75) 0%,rgba(8,3,20,0) 26%),
+  radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(0,0,0,.45) 100%)}
+#menu .mm-fade{position:absolute;inset:0;background:#05030c;opacity:0;pointer-events:none;transition:opacity .9s ease}
+#menu .mm-fade.on{opacity:1}
+.mm-left{position:absolute;left:max(4vw,24px);top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:4vh;width:min(470px,86vw);padding-bottom:6vh}
+.mm-logo{line-height:.82;user-select:none;animation:mmIn .9s ease both}
+.mm-logo .mm-l1,.mm-logo .mm-l2{display:block;font-family:"Avenir Next Condensed","Futura","Arial Narrow",Impact,"Arial Black",sans-serif;font-weight:900;font-style:italic;letter-spacing:-.01em;
+  background:linear-gradient(100deg,#ffd36e 0%,#ff8a3d 28%,#ff2d95 58%,#b44bff 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 6px 26px rgba(255,45,149,.45))}
+.mm-logo .mm-l1{font-size:clamp(64px,11vw,132px)}
+.mm-logo .mm-l2{font-size:clamp(58px,10vw,120px);margin-left:.18em}
+.mm-logo .mm-l1,.mm-logo .mm-l2{width:max-content;padding-right:.16em}
+.mm-sub{display:flex;align-items:center;gap:14px;margin-top:16px;font-size:clamp(13px,1.6vw,17px);letter-spacing:.55em;color:#e9fbff;font-weight:600;text-shadow:0 0 18px rgba(34,228,255,.7)}
+.mm-sub i{flex:0 0 44px;height:2px;background:linear-gradient(90deg,transparent,#22e4ff)}
+.mm-sub i:last-child{background:linear-gradient(90deg,#22e4ff,transparent)}
+.mm-nav{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.mm-item{position:relative;background:none;border:0;color:#fff;cursor:pointer;text-align:left;padding:8px 18px 8px 22px;margin-left:-22px;border-radius:0 12px 12px 0;
+  font-family:"Avenir Next Condensed","Futura","Arial Narrow","Arial Black",sans-serif;transition:transform .18s ease,background .18s ease,color .18s;animation:mmIn .7s ease both}
+.mm-item .mm-t{display:block;font-size:clamp(22px,2.6vw,30px);font-weight:800;font-style:italic;letter-spacing:.06em;opacity:.82;transition:opacity .18s}
+.mm-item small{display:block;font-size:13px;color:#ffd7a0;font-weight:500;letter-spacing:.04em;margin-top:2px}
+.mm-item::before{content:"";position:absolute;left:0;top:18%;bottom:18%;width:4px;border-radius:2px;background:linear-gradient(180deg,#ff8a3d,#ff2d95);transform:scaleY(0);transition:transform .18s ease}
+.mm-item:hover,.mm-item.sel{transform:translateX(10px);background:linear-gradient(90deg,rgba(255,45,149,.22),rgba(255,45,149,0))}
+.mm-item:hover .mm-t,.mm-item.sel .mm-t{opacity:1}.mm-item:hover::before,.mm-item.sel::before{transform:scaleY(1)}
+.mm-item.on{transform:translateX(10px)}.mm-item.on .mm-t{opacity:1;color:#ffd0a0}.mm-item.on::before{transform:scaleY(1)}
+.mm-item.mm-primary .mm-t{font-size:clamp(34px,4.2vw,50px);opacity:1;background:linear-gradient(90deg,#fff,#ffe3b0);-webkit-background-clip:text;background-clip:text;color:transparent}
+.mm-item.mm-primary{margin-bottom:10px}
+.mm-item.mm-primary::after{content:"▶";position:absolute;right:-26px;top:50%;transform:translateY(-62%);font-size:22px;color:#ff2d95;animation:mmPulse 1.6s ease-in-out infinite}
+.mm-item.mm-small .mm-t{font-size:16px;letter-spacing:.14em;opacity:.6}
+.mm-nav .mm-item:nth-child(1){animation-delay:.15s}.mm-nav .mm-item:nth-child(2){animation-delay:.2s}.mm-nav .mm-item:nth-child(3){animation-delay:.25s}.mm-nav .mm-item:nth-child(4){animation-delay:.3s}.mm-nav .mm-item:nth-child(5){animation-delay:.35s}.mm-nav .mm-item:nth-child(6){animation-delay:.4s}
+.mm-panel{position:absolute;right:max(3vw,16px);top:50%;transform:translateY(-50%);width:min(560px,92vw);max-height:78vh;display:flex;flex-direction:column;background:rgba(14,8,32,.72);
+  border:1px solid rgba(255,255,255,.14);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);animation:mmPanel .35s ease both}
+.mm-panel.hidden{display:none}
+.mm-phead{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.1);font-weight:800;font-style:italic;letter-spacing:.12em;font-size:18px;text-transform:uppercase;
+  background:linear-gradient(90deg,rgba(255,138,61,.22),rgba(255,45,149,.16),rgba(180,75,255,.12));border-radius:18px 18px 0 0}
+.mm-phead button{background:rgba(255,255,255,.1);border:0;color:#fff;width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer}
+.mm-pbody{overflow:auto;padding:16px 20px 18px;-webkit-overflow-scrolling:touch}
+.mm-pbody>div{display:none}.mm-pbody>div.on{display:block}
+.mm-pbody .opts{grid-template-columns:1fr;margin:0}
+.mm-pbody .opts label{padding:12px 14px;font-size:15px}
+.mm-pbody .opts input[type=range]{width:46%}
+.mm-pbody .controls{grid-template-columns:1fr}
+.mm-note{color:#a99fc4;font-size:12px;margin-top:12px}
+.mm-credits h4{font-size:18px;margin:0 0 10px;font-style:italic;background:linear-gradient(90deg,#ffd36e,#ff2d95);-webkit-background-clip:text;background-clip:text;color:transparent}
+.mm-credits p{color:#ddd5f0;font-size:14px;line-height:1.5;margin:8px 0}
+.mm-save{position:absolute;right:max(3vw,16px);bottom:64px;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;animation:mmIn .9s .4s ease both}
+.mm-save .chip{background:rgba(10,6,24,.6);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:7px 14px;font-size:13px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.mm-save .chip b{color:#7dff9a}
+.mm-foot{position:absolute;left:max(4vw,24px);right:max(3vw,16px);bottom:20px;display:flex;justify-content:space-between;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+#mmShot::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff2d95;margin-right:10px;box-shadow:0 0 10px #ff2d95;animation:mmPulse 1.6s ease-in-out infinite}
+@keyframes mmIn{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+@keyframes mmPanel{from{opacity:0;transform:translate(20px,-50%)}to{opacity:1;transform:translateY(-50%)}}
+@keyframes mmPulse{0%,100%{opacity:.4}50%{opacity:1}}
+@media (max-width:760px),(max-height:520px){
+  .mm-left{justify-content:flex-end;padding-bottom:84px;gap:2.5vh}
+  .mm-logo .mm-l1{font-size:clamp(48px,16vw,84px)}.mm-logo .mm-l2{font-size:clamp(44px,15vw,78px)}
+  .mm-panel{top:auto;bottom:16px;transform:none;max-height:72vh;animation:none}
+  .mm-save{top:16px;bottom:auto;right:16px}
+  #menu .mm-shade{background:linear-gradient(0deg,rgba(8,3,20,.92) 0%,rgba(8,3,20,.55) 55%,rgba(8,3,20,.1) 100%)}
+}
+@media (max-height:520px){.mm-left{justify-content:center;padding-bottom:30px}.mm-logo .mm-l1,.mm-logo .mm-l2{font-size:clamp(36px,9vh,64px);display:inline-block}.mm-item.mm-primary .mm-t{font-size:30px}.mm-item .mm-t{font-size:20px}}

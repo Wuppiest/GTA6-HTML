@@ -4,8 +4,9 @@
 // =====================================================================
 let GameTime = 0;
 class Marker {
+  static all = [];
   constructor(color, label, radius = 2.2, ring = false) {
-    this.radius = radius; this.group = new THREE.Group();
+    this.radius = radius; this.group = new THREE.Group(); Marker.all.push(this);
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
     if (ring) { this.cyl = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.6, 10, 40), mat); this.cyl.material.opacity = 0.75; this.group.add(this.cyl); }
     else { this.cyl = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 2.4, 32, 1, true), mat); this.cyl.position.y = 1.2; this.group.add(this.cyl);
@@ -416,10 +417,74 @@ const AdminUI = {
 };
 
 // ---------- SPIELSTEUERUNG & HAUPTSCHLEIFE ----------
+// ---------- HAUPTMENÜ: Titelbildschirm mit Kamerafahrten zur goldenen Stunde ----------
+const MainMenu = {
+  shot: 0, t: 0, shots: null, sel: 0, panel: null, menuTime: 18.35, hidden: null,
+  init() {
+    $('mmPClose').onclick = () => this.openPanel(null);
+    document.querySelectorAll('#mmNav [data-panel]').forEach(b => b.onclick = () => { Audio.init(); Audio.click(660); this.openPanel(this.panel === b.dataset.panel ? null : b.dataset.panel); });
+    $('btnNew').onclick = () => { if (confirm('Neues Spiel starten? Der aktuelle Spielstand wird gelöscht.')) { Save.reset(); location.reload(); } };
+    const items = () => [...document.querySelectorAll('#mmNav .mm-item:not(.hidden)')];
+    addEventListener('keydown', (e) => { if (GS.state !== STATES.MENU) return; const it = items(); if (!it.length) return;
+      if (e.code === 'ArrowDown' || e.code === 'ArrowUp') { this.sel = (this.sel + (e.code === 'ArrowDown' ? 1 : -1) + it.length) % it.length; it.forEach((b, i) => b.classList.toggle('sel', i === this.sel)); e.preventDefault(); }
+      else if (e.code === 'Enter') { (it[this.sel] || it[0]).click(); e.preventDefault(); }
+      else if (e.code === 'Escape' && this.panel) this.openPanel(null); });
+    this.refresh();
+  },
+  openPanel(p) {
+    this.panel = p; $('mmPanel').classList.toggle('hidden', !p);
+    document.querySelectorAll('#mmNav [data-panel]').forEach(b => b.classList.toggle('on', b.dataset.panel === p));
+    if (!p) return; $('mmPTitle').textContent = { opts: 'Einstellungen', ctrl: 'Steuerung', credits: 'Credits' }[p];
+    document.querySelectorAll('#mmPanel [data-p]').forEach(d => d.classList.toggle('on', d.dataset.p === p)); UI.syncOptions();
+  },
+  // Spielstand anzeigen: „Weiterspielen“ mit Geld, Missionen, Muscheln, Fahrzeugen
+  refresh() {
+    let d = null; try { d = JSON.parse(localStorage.getItem(Save.KEY) || 'null'); } catch (e) { d = null; }
+    const nM = Missions.defs.length;
+    $('playLabel').textContent = GS.started ? 'FORTSETZEN' : d ? 'WEITERSPIELEN' : 'SPIELEN';
+    $('playSub').textContent = GS.started ? 'Zurück auf die Straßen von Solara' : d ? `Spielstand: $${(d.money || 0).toLocaleString('de-DE')} · ${(d.done || []).length}/${nM} Missionen` : 'Starte deine Geschichte mit Kai & Elena';
+    $('btnNew').classList.toggle('hidden', !(GS.started || d));
+    const src = GS.started ? { money: GS.money, done: [...Missions.done], collected: [...Act.collected], garage: Act.garage } : d;
+    const shells = (Act.shells || []).length || 30;
+    $('mmSave').innerHTML = src ? `<span class="chip">💵 <b>$${(src.money || 0).toLocaleString('de-DE')}</b></span><span class="chip">🎬 <b>${(src.done || []).length}</b>/${nM} Missionen</span><span class="chip">🐚 <b>${(src.collected || []).length}</b>/${shells} Muscheln</span><span class="chip">🚗 <b>${(src.garage || []).length}</b> ${(src.garage || []).length === 1 ? 'Fahrzeug' : 'Fahrzeuge'}</span>` : '';
+    $('mmHint').textContent = Settings.touch ? 'Tippe auf SPIELEN' : 'Pfeiltasten + Enter oder Klick';
+  },
+  // Missions-/Shop-Marker im Titelbild ausblenden und danach exakt wiederherstellen
+  hideMarkers() { if (this.hidden) return; this.hidden = Marker.all.filter(m => m.group.visible); this.hidden.forEach(m => { m.group.visible = false; }); },
+  restoreMarkers() { if (!this.hidden) return; this.hidden.forEach(m => { m.group.visible = true; }); this.hidden = null; },
+  // Kamerafahrten: Start-/Endpunkt der Kamera und Blickziel
+  buildShots() {
+    const ground = (x, z) => Math.max(terrainHeight(x, z), CFG.WATER_Y), up = (v, y) => V3(v.x, ground(v.x, v.z) + y, v.z), out = [];
+    const D = V3(DOWNTOWN.x, 0, DOWNTOWN.z);
+    if (LOC.beach) { const B = LOC.beach, bd = V3(B.x - D.x, 0, B.z - D.z).normalize(), side = V3(-bd.z, 0, bd.x);
+      out.push({ name: 'Skyline vom Strand', p0: up(B.clone().addScaledVector(bd, 120).addScaledVector(side, -40), 11), p1: up(B.clone().addScaledVector(bd, 105).addScaledVector(side, 20), 13), l0: V3(D.x - side.x * 60, 62, D.z - side.z * 60), l1: V3(D.x - side.x * 40, 58, D.z - side.z * 40) }); }
+    const C = Roads.groups && Roads.groups.collins, n0 = C && C[4], n1 = C && (C[5] || C[3]);
+    if (n0 && n1) { const dir = V3(n1.x - n0.x, 0, n1.z - n0.z).normalize(), pr = V3(-dir.z, 0, dir.x), p = V3(n0.x, 0, n0.z).addScaledVector(pr, 5), gy = ground(p.x, p.z);
+      out.push({ name: 'Ocean Drive', p0: V3(p.x, gy + 2.2, p.z), p1: V3(p.x + dir.x * 28, gy + 2.6, p.z + dir.z * 28), l0: V3(n0.x + dir.x * 140, gy + 9, n0.z + dir.z * 140), l1: V3(n0.x + dir.x * 170, gy + 8, n0.z + dir.z * 170) }); }
+    if (LOC.pier) { const pd = V3(Math.cos(0.42), 0, Math.sin(0.42)), ps = V3(-pd.z, 0, pd.x), W = LOC.pier.clone().addScaledVector(pd, 110);
+      out.push({ name: 'Solara Pier', p0: up(LOC.pier.clone().addScaledVector(pd, 30).addScaledVector(ps, 70), 9), p1: up(LOC.pier.clone().addScaledVector(pd, 55).addScaledVector(ps, 55), 11), l0: V3(W.x, 24, W.z), l1: V3(W.x, 22, W.z) }); }
+    if (LOC.marina) { const md = V3(Math.cos(-0.3), 0, Math.sin(-0.3)), ms = V3(-md.z, 0, md.x), M = LOC.marina;
+      out.push({ name: 'Solara Marina', p0: V3(M.x + md.x * 95 + ms.x * 50, 12, M.z + md.z * 95 + ms.z * 50), p1: V3(M.x + md.x * 80 + ms.x * 10, 9, M.z + md.z * 80 + ms.z * 10), l0: V3(M.x + md.x * 20, 4, M.z + md.z * 20), l1: V3(M.x, 6, M.z) }); }
+    out.push({ name: 'Downtown Solara', orbit: true, r: 360, y: 175 });
+    if (LOC.summit) { const S = LOC.summit; out.push({ name: 'Mount Leona', p0: up(V3(S.x + 60, 0, S.z + 90), 14), p1: up(V3(S.x + 90, 0, S.z + 55), 16), l0: V3(D.x, 30, D.z), l1: V3(D.x + 80, 30, D.z) }); }
+    return out;
+  },
+  setShot(i) { this.shot = i; this.t = 0; $('mmShot').textContent = this.shots[i].name; },
+  updateCam(dt) {
+    if (!this.shots) { this.shots = this.buildShots(); this.setShot(0); }
+    const S = this.shots[this.shot], dur = S.orbit ? 13 : 11; this.t += dt; const k = smooth(clamp(this.t / dur, 0, 1));
+    camera.up.set(0, 1, 0);
+    if (S.orbit) { const a = 0.4 + this.t * 0.035; camera.position.set(DOWNTOWN.x + Math.cos(a) * S.r, S.y, DOWNTOWN.z + Math.sin(a) * S.r); camera.lookAt(DOWNTOWN.x, 45, DOWNTOWN.z); }
+    else { camera.position.lerpVectors(S.p0, S.p1, k); tmpV1.lerpVectors(S.l0, S.l1, k); camera.lookAt(tmpV1); }
+    Cam.setFov(S.orbit ? 55 : 50);
+    $('mmFade').classList.toggle('on', this.t > dur - 0.9 || this.t < 0.2);
+    if (this.t >= dur) this.setShot((this.shot + 1) % this.shots.length);
+  },
+};
 const Game = {
   overT: 0, pausedFrom: null, pausedAt: 0, errors: 0,
   start() {
-    Audio.init(); Audio.applyVolume(); $('menu').classList.add('hidden'); $('hud').classList.remove('hidden'); $('touch').classList.toggle('on', !!Settings.touch);
+    Audio.init(); Audio.applyVolume(); MainMenu.openPanel(null); $('menu').classList.add('hidden'); MainMenu.restoreMarkers(); Env.time = this.savedTime ?? CFG.START_TIME; $('hud').classList.remove('hidden'); $('touch').classList.toggle('on', !!Settings.touch);
     if (!GS.started) { GS.started = true; if (Save.has() && Save.load()) setTimeout(() => UI.notify('💾 Spielstand geladen'), 3600); Cam.yaw = Player.active.yaw + Math.PI; Cam.snap = true; UI.bigText('SOLARA ISLAND', 'Kai & Elena · Vice Legacy', 'title', 3.5);
       UI.help(`Willkommen auf Solara Island!<br>${Settings.touch ? 'Linker Stick: laufen · rechts wischen: Kamera · <b>EIN/AUS</b>: Fahrzeug' : '<kbd>WASD</kbd> laufen · <kbd>F</kbd> Fahrzeug · <kbd>E</kbd> Interaktion · <kbd>U</kbd> Handy · <kbd>TAB</kbd> Figur · <kbd>K</kbd> Karte'}<br>Story-Missionen <b>M1–M7</b>, Shops, Jobs, Zeitrennen ⏱, Stuntsprünge und 30 goldene Muscheln warten. Das <b>HANDY</b> liefert deine Fahrzeuge.`, 12); Audio.setStation(1); }
     GS.set(Missions.active ? STATES.MISSION_ACTIVE : STATES.PLAYING); Cam.snap = true; In.lock(); renderer.domElement.focus();
@@ -427,7 +492,7 @@ const Game = {
   pause() { if (!GS.playing) return; this.pausedFrom = GS.state; GS.set(STATES.PAUSED); this.pausedAt = performance.now(); $('pause').classList.remove('hidden'); UI.syncOptions(); In.unlock(); Audio.setHorn(false); },
   resume() { $('pause').classList.add('hidden'); $('missionMenu').classList.add('hidden'); if (GS.state !== STATES.PAUSED) return; GS.set(Missions.active ? STATES.MISSION_ACTIVE : STATES.PLAYING); In.lock(); },
   openMissions() { if (GS.playing) { this.pausedFrom = GS.state; GS.set(STATES.PAUSED); this.pausedAt = performance.now(); } else if (GS.state !== STATES.PAUSED) return; $('pause').classList.add('hidden'); UI.buildMissionList(); $('missionMenu').classList.remove('hidden'); In.unlock(); },
-  mainMenu() { $('pause').classList.add('hidden'); $('missionMenu').classList.add('hidden'); $('hud').classList.add('hidden'); $('touch').classList.remove('on'); GS.set(STATES.MENU); $('menu').classList.remove('hidden'); UI.syncOptions(); },
+  mainMenu() { this.savedTime = Env.time; MainMenu.refresh(); MainMenu.openPanel(null); $('pause').classList.add('hidden'); $('missionMenu').classList.add('hidden'); $('hud').classList.add('hidden'); $('touch').classList.remove('on'); GS.set(STATES.MENU); $('menu').classList.remove('hidden'); UI.syncOptions(); },
   toggleSound() { Settings.sound = !Settings.sound; saveSettings(); Audio.init(); Audio.applyVolume(); UI.syncOptions(); UI.notify(Settings.sound ? '🔊 Ton an' : '🔇 Ton aus'); },
   applyQuality() {
     const q = Q(); renderer.setPixelRatio(q.pr); renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = q.shadows; Env.applyQuality();
@@ -453,14 +518,14 @@ const Game = {
       if (GS.playing && !GS.switching && !Admin.open) { if (In.hit('Tab')) Cam.startSwitch(); if (In.hit('KeyT')) Env.nextTime(); if (In.hit('KeyG')) Env.nextWeather(); }
     }
     if (GS.state === STATES.WASTED || GS.state === STATES.BUSTED) { this.overT -= realDt; if (this.overT <= 0) this.respawn(); }
-    const menu = GS.state === STATES.MENU, paused = GS.state === STATES.PAUSED || BigMap.isOpen; const focus = menu ? tmpFocus.set(DOWNTOWN.x, 5, DOWNTOWN.z) : Player.targetPos();
+    const menu = GS.state === STATES.MENU, paused = GS.state === STATES.PAUSED || BigMap.isOpen; if (menu) { Env.time = MainMenu.menuTime; MainMenu.hideMarkers(); } const focus = menu ? tmpFocus.set(DOWNTOWN.x, 5, DOWNTOWN.z) : Player.targetPos();
     if (!paused) {
       // Simulation in festen Teilschritten (max. 1/45 s): auch bei niedriger Bildrate Echtzeit & stabile Physik
       const steps = Math.min(4, Math.max(1, Math.ceil(dt * 45))), sdt = dt / steps;
       for (let k = 0; k < steps; k++) { Player.update(sdt); VS.update(sdt, focus); NPCS.update(sdt, focus); Missiles.update(sdt); if (k === 0) { In.pressed.clear(); In.lmbPressed = false; In.wheel = 0; } }
       if (GS.playing) { Wanted.update(dt); Missions.update(dt); Act.update(dt); }
       Pickups.update(dt); FX.update(dt); Env.update(dt, focus); for (const f of World.anim) f(dt); World.updateLOD(camera.position); Signals.update(dt); FX.pool.update(dt, focus, Env.night);
-      if (menu) { const a = GameTime * 0.03; camera.up.set(0, 1, 0); camera.position.set(DOWNTOWN.x + Math.cos(a) * 420, 170, DOWNTOWN.z + Math.sin(a) * 420); camera.lookAt(DOWNTOWN.x, 40, DOWNTOWN.z); Cam.setFov(60); }
+      if (menu) MainMenu.updateCam(realDt);
       else Cam.update(realDt);
     }
     const pv = Player.vehicle;
@@ -504,7 +569,7 @@ window.__startGame = async function () {
   buildWorld(); console.log('Welt gebaut in', Math.round(performance.now() - t0), 'ms');
   Env = new Environment(); Post.init(); FX.init();
   VS = new VehicleSystem(); NPCS = new NPCSystem();
-  Player.init(); Pickups.init(); Missions.init(); Act.init(); UI.init(); BigMap.init(); In.initTouch();
+  Player.init(); Pickups.init(); Missions.init(); Act.init(); UI.init(); MainMenu.init(); BigMap.init(); In.initTouch();
   VS.spawnParked();
   for (const ch of Player.chars) { ch.h.group.position.copy(ch.pos); ch.h.group.rotation.y = ch.yaw; }
   window.__loadMsg('Bereite Shader vor …'); window.__loadBar(0.9); await new Promise(r => setTimeout(r, 20));
@@ -512,5 +577,5 @@ window.__startGame = async function () {
   window.__booted = true; window.__loadBar(1);
   $('loading').style.display = 'none'; $('menu').classList.remove('hidden');
   requestAnimationFrame(frame);
-  window.__game = { Post, FX, MAT, GS, Player, VS, NPCS, Wanted, Missions, Env, Cam, Game, In, Audio, World, STATES, renderer, scene, camera, Admin, AdminUI, BigMap, LOC, Roads, CFG, Missiles, Assets, Act, Save, Menu, Signals, Ramps };
+  window.__game = { Post, FX, MAT, GS, Player, VS, NPCS, Wanted, Missions, Env, Cam, Game, In, Audio, World, STATES, renderer, scene, camera, Admin, AdminUI, BigMap, LOC, Roads, CFG, Missiles, Assets, Act, Save, Menu, MainMenu, Signals, Ramps };
 };

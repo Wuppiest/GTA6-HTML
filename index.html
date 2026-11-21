@@ -82,21 +82,39 @@
 <div id="flash"></div>
 
 <div id="menu" class="overlay hidden">
-  <div class="menuBox">
-    <div class="logo"><span class="l1">VICE LEGACY</span><span class="l2">SOLARA</span></div>
-    <div class="tag">SOLARA ISLAND · TROPISCHE OPEN WORLD · KAI &amp; ELENA</div>
-    <div class="btnRow"><button class="big" id="btnPlay">▶ SPIELEN</button><button class="mid" id="btnFull">⛶ Vollbild</button></div>
-    <h3 class="sec">Optionen</h3>
-    <div class="opts" id="optsMenu"></div>
-    <h3 class="sec">Steuerung</h3>
-    <div class="controls" id="controlsMenu"></div>
-    <details class="credits"><summary>Credits &amp; Lizenzen</summary>
-      <p>Spiel &amp; Code: Vice Legacy (Wuppiest) · Engine: <b>three.js</b> (MIT)</p>
-      <p>3D-Modelle (Autos, Menschen, Frisuren, Bäume, Palmen, Felsen): <b>Quaternius</b> – CC0 / Public Domain</p>
-      <p>Foto-Texturen (Asphalt, Gehweg, Putz, Fassaden, Dächer, Gras, Sand, Fels …): <b>ambientCG</b> – CC0 / Public Domain</p>
-      <p>Vollständige Liste: CREDITS.md im Repository.</p>
-    </details>
+  <div class="mm-shade"></div>
+  <div class="mm-fade" id="mmFade"></div>
+  <div class="mm-left">
+    <div class="mm-logo">
+      <span class="mm-l1">VICE</span><span class="mm-l2">LEGACY</span>
+      <span class="mm-sub"><i></i>SOLARA ISLAND<i></i></span>
+    </div>
+    <nav class="mm-nav" id="mmNav">
+      <button class="mm-item mm-primary" id="btnPlay"><span class="mm-t" id="playLabel">SPIELEN</span><small id="playSub">Starte deine Geschichte mit Kai &amp; Elena</small></button>
+      <button class="mm-item hidden" id="btnNew"><span class="mm-t">NEUES SPIEL</span></button>
+      <button class="mm-item" data-panel="opts"><span class="mm-t">EINSTELLUNGEN</span></button>
+      <button class="mm-item" data-panel="ctrl"><span class="mm-t">STEUERUNG</span></button>
+      <button class="mm-item" data-panel="credits"><span class="mm-t">CREDITS</span></button>
+      <button class="mm-item mm-small" id="btnFull"><span class="mm-t">⛶ VOLLBILD</span></button>
+    </nav>
   </div>
+  <div class="mm-panel hidden" id="mmPanel">
+    <div class="mm-phead"><span id="mmPTitle">Einstellungen</span><button id="mmPClose" aria-label="Schließen">✕</button></div>
+    <div class="mm-pbody">
+      <div data-p="opts"><div class="opts" id="optsMenu"></div><p class="mm-note">Die Auflösung passt sich automatisch an, damit das Spiel flüssig bleibt.</p></div>
+      <div data-p="ctrl"><div class="controls" id="controlsMenu"></div></div>
+      <div data-p="credits" class="mm-credits">
+        <h4>Vice Legacy – Solara Island</h4>
+        <p>Spiel, Code &amp; Welt: <b>Wuppiest</b> · Engine: <b>three.js</b> (MIT)</p>
+        <p>3D-Modelle (Autos, Menschen, Frisuren, Bäume, Palmen, Felsen): <b>Quaternius</b> – CC0</p>
+        <p>Foto-Texturen (Asphalt, Gehweg, Putz, Fassaden, Dächer, Gras, Sand, Fels): <b>ambientCG</b> – CC0</p>
+        <p>Musik, Sounds, Himmel, Wasser &amp; Stadt werden live im Code erzeugt.</p>
+        <p class="mm-note">Vollständige Liste: CREDITS.md im Repository.</p>
+      </div>
+    </div>
+  </div>
+  <div class="mm-save" id="mmSave"></div>
+  <div class="mm-foot"><span id="mmShot">Downtown Solara</span><span>v4 · <span id="mmHint">Klicke auf SPIELEN</span></span></div>
 </div>
 
 <div id="pause" class="overlay hidden">

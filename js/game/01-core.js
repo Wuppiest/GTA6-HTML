@@ -130,7 +130,7 @@ class Input {
     el.addEventListener('contextmenu', (e) => e.preventDefault());
   }
   initTouch() {
-    const tz = $('touch'); tz.classList.toggle('on', !!Settings.touch);
+    const tz = $('touch'); tz.classList.toggle('on', !!Settings.touch && GS.state !== STATES.MENU);
     const sz = $('stickZone'), base = $('stickBase'), knob = $('stickKnob'); let sid = null, ox = 0, oy = 0;
     sz.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.changedTouches[0]; sid = t.identifier; ox = t.clientX; oy = t.clientY; base.style.display = 'block'; base.style.left = ox + 'px'; base.style.top = (oy - sz.getBoundingClientRect().top) + 'px'; this.stick.active = true; Audio.init(); }, { passive: false });
     const mv = (e) => { for (const t of e.changedTouches) if (t.identifier === sid) { let dx = (t.clientX - ox) / 60, dy = (t.clientY - oy) / 60; const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; } this.stick.x = dx; this.stick.y = dy; knob.style.transform = `translate(${dx * 45}px,${dy * 45}px)`; } };
